@@ -470,7 +470,7 @@ final class LyricsStore: ObservableObject {
         if !items.isEmpty { c.queryItems = items }
         guard let url = c.url else { return nil }
         var r = URLRequest(url: url, timeoutInterval: 10)
-        r.setValue("NotchLyrics/1.0 (personal macOS app)", forHTTPHeaderField: "User-Agent")
+        r.setValue("NotchLyrics/1.1 (macOS)", forHTTPHeaderField: "User-Agent")
         return r
     }
 
