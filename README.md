@@ -8,6 +8,10 @@
   Time-synced lyrics in your MacBook's notch, for Spotify and Apple Music.
 </p>
 
+<p align="center">
+  <img src="Resources/screenshot.png" width="640" alt="NotchLyrics expanded view with Japanese lyrics, romanization and translation">
+</p>
+
 ---
 
 ## Features
@@ -32,7 +36,7 @@ NotchLyrics is distributed as source. Building requires the Xcode Command Line T
 
 ```bash
 xcode-select --install          # if not installed yet
-git clone https://github.com/<your-username>/NotchLyrics.git
+git clone https://github.com/rezaprahenda/NotchLyrics.git
 cd NotchLyrics
 ./build.sh install              # builds and copies the app to /Applications
 ```
