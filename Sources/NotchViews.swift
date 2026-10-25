@@ -43,8 +43,26 @@ struct NotchRootView: View {
         let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: doubleLine)
         let radius = vm.cornerRadius(for: mode)
 
+        // Saat kursor mendekati baris lirik (tembus klik), latar di bawah menu bar ikut memudar,
+        // bukan hanya teksnya, supaya area di bawahnya terlihat jelas dan siap diklik.
+        let lowerOpacity: Double = (mode == .compact && vm.lyricLineFaded) ? 0.12 : 1
+
         ZStack(alignment: .top) {
-            NotchShape(radius: radius).fill(Color.black)
+            NotchShape(radius: radius)
+                .fill(Color.black)
+                .mask(alignment: .top) {
+                    // Gradasi halus dari pekat (menu bar) ke transparan (baris lirik), tanpa garis potong.
+                    VStack(spacing: 0) {
+                        Rectangle()
+                            .frame(height: vm.notchSize.height) // area notch fisik tetap pekat
+                        // Gradasi membentang di seluruh area baris lirik; memudar lebih cepat di awal.
+                        LinearGradient(stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black.opacity(lowerOpacity + (1 - lowerOpacity) * 0.35), location: 0.3),
+                            .init(color: .black.opacity(lowerOpacity), location: 1),
+                        ], startPoint: .top, endPoint: .bottom)
+                    }
+                }
 
             // Mesin terjemahan (tak terlihat), selalu terpasang supaya terjemahan siap sebelum hover.
             if #available(macOS 15.0, *) {
@@ -130,7 +148,7 @@ struct CompactView: View {
                 .padding(.horizontal, 16)
                 .frame(height: (lyrics.compactIsDouble ? vm.compactDoubleLyricHeight : vm.compactLyricHeight) - 4)
                 .clipped()
-                .opacity(vm.lyricLineSuppressed ? 0 : (vm.lyricLineFaded ? 0.08 : 1))
+                .opacity(vm.lyricLineSuppressed ? 0 : (vm.lyricLineFaded ? 0.15 : 1))
             }
         }
     }
