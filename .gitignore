@@ -1,0 +1,8 @@
+# Hasil build
+build/
+
+# File sistem macOS
+.DS_Store
+
+# Arsip unduhan
+*.zip
