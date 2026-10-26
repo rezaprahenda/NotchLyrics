@@ -304,7 +304,14 @@ final class NotchController {
         }
 
         var inside = mode != .hidden && activeRect.insetBy(dx: -4, dy: -4).contains(mouse)
-        if let ear = vm.hiddenEar, columnRect(ear).contains(mouse) { inside = false }
+        // Di mode ringkas, area telinga (dan sisi yang sedang disembunyikan) hanya untuk
+        // menyingkirkan sisi itu; jangan sampai membuka panel penuh. Pemicu buka panel
+        // berjeda 0,12 detik, lebih cepat dari jeda sembunyi sisi (0,15), jadi harus
+        // dicegah di sini, bukan menunggu `hiddenEar` terisi.
+        if mode == .compact {
+            if earRect(.left).contains(mouse) || earRect(.right).contains(mouse) { inside = false }
+            if let ear = vm.hiddenEar, columnRect(ear).contains(mouse) { inside = false }
+        }
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }
