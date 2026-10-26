@@ -179,7 +179,7 @@ final class NotchController {
         }
 
         // Cadangan untuk kasus event mouse terlewat atau ukuran berubah karena lagu ganti.
-        let t = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+        let t = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.updateHover()
         }
         RunLoop.main.add(t, forMode: .common)

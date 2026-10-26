@@ -118,7 +118,8 @@ struct CompactView: View {
             .frame(height: vm.notchSize.height)
 
             if showLine, let lines = lyrics.state.syncedLines {
-                TimelineView(.periodic(from: .now, by: 0.1)) { _ in
+                // Berhenti berdetak saat musik di-pause, supaya tidak memakan CPU.
+                TimelineView(.animation(minimumInterval: 0.1, paused: !player.isPlaying)) { _ in
                     let idx = lyrics.currentIndex(in: lines, position: player.position)
                     let original = idx.map { lines[$0].text } ?? ""
                     let texts: (primary: String, secondary: String?) = idx.map {

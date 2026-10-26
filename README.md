@@ -32,7 +32,20 @@
 
 ## Installation
 
-NotchLyrics is distributed as source. Building requires the Xcode Command Line Tools.
+### Download
+
+Grab `NotchLyrics.zip` from the [latest release](https://github.com/rezaprahenda/NotchLyrics/releases/latest),
+unzip it and move `NotchLyrics.app` to `/Applications`.
+
+The app is not notarized, so macOS may say it "can't be opened" or "is damaged". Run this once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/NotchLyrics.app
+```
+
+### Build from source
+
+Building requires the Xcode Command Line Tools.
 
 ```bash
 xcode-select --install          # if not installed yet

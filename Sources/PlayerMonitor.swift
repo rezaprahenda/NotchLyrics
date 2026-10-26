@@ -95,8 +95,9 @@ final class PlayerMonitor: ObservableObject {
 
     /// Jeda polling rutin. Perubahan lagu/status sudah ditangkap instan lewat sinyal dari
     /// Spotify & Music, jadi polling hanya untuk mengoreksi posisi dan volume/shuffle/repeat.
-    private static let pollIntervalPlaying: TimeInterval = 3
-    private static let pollIntervalIdle: TimeInterval = 6
+    /// Tiap poll menjalankan proses osascript baru, jadi dibuat jarang demi baterai.
+    private static let pollIntervalPlaying: TimeInterval = 5
+    private static let pollIntervalIdle: TimeInterval = 10
     private var nextPollAt = Date.distantPast
     private var needsRepoll = false
     private var signalObservers: [NSObjectProtocol] = []
@@ -428,6 +429,9 @@ final class PlayerMonitor: ObservableObject {
         guard p.count >= 8 else {
             return .failure("\(source.displayName): format tak dikenal: \(out.prefix(80))")
         }
+
+        // Iklan Spotify: jangan cari lirik / tampilkan judulnya; anggap tidak ada lagu.
+        if source == .spotify, p[1].hasPrefix("spotify:ad:") { return .success(nil) }
 
         let rawDuration = Self.number(p[5])
         let duration = source == .spotify ? rawDuration / 1000 : rawDuration // Spotify pakai milidetik

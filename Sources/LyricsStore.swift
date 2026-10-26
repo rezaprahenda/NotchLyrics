@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Network
 
 struct LyricLine: Identifiable, Equatable, Codable {
     let id: Int
@@ -70,6 +71,20 @@ private struct LRCLibResult: Decodable {
     let instrumental: Bool?
     let plainLyrics: String?
     let syncedLyrics: String?
+}
+
+/// Hasil satu kali mencari lirik di LRCLIB.
+private enum FetchOutcome {
+    case found(LyricsState)
+    /// Server menjawab, tapi tidak ada lirik yang cocok.
+    case missing
+    /// Jaringan / server bermasalah — layak dicoba lagi nanti.
+    case failed
+
+    var isFailure: Bool {
+        if case .failed = self { return true }
+        return false
+    }
 }
 
 /// Wadah hasil gabungan beberapa request paralel.
@@ -160,6 +175,27 @@ final class LyricsStore: ObservableObject {
     private(set) var currentKey: String?
     private var currentTrack: Track?
     private var cancellable: AnyCancellable?
+
+    // MARK: Coba lagi saat jaringan gagal
+
+    private var retryKey: String?
+    private var retryAttempts = 0
+    private var retryWork: DispatchWorkItem?
+    private static let maxTimedRetries = 3
+    private let pathMonitor = NWPathMonitor()
+    private var networkAvailable = true
+
+    init() {
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let available = path.status == .satisfied
+            DispatchQueue.main.async { self?.networkChanged(available) }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "notchlyrics.network", qos: .utility))
+    }
+
+    deinit {
+        pathMonitor.cancel()
+    }
 
     private static func storedBool(_ key: String, _ defaultValue: Bool) -> Bool {
         (UserDefaults.standard.object(forKey: key) as? Bool) ?? defaultValue
@@ -324,6 +360,10 @@ final class LyricsStore: ObservableObject {
         isPickerOpen = false
         candidates = []
         isSearchingCandidates = false
+        retryWork?.cancel()
+        retryWork = nil
+        retryKey = nil
+        retryAttempts = 0
 
         guard let track else {
             currentKey = nil
@@ -363,12 +403,20 @@ final class LyricsStore: ObservableObject {
     }
 
     private func automaticFetch(_ track: Track, key: String) {
-        fetchExact(track) { [weak self] result in
-            if let result {
+        fetchExact(track) { [weak self] exact in
+            if case .found(let result) = exact {
                 self?.finish(key, result)
-            } else {
-                self?.fetchSearch(track) { r in
-                    self?.finish(key, r ?? .notFound)
+                return
+            }
+            self?.fetchSearch(track) { search in
+                switch search {
+                case .found(let result):
+                    self?.finish(key, result)
+                case .missing where !exact.isFailure:
+                    self?.finish(key, .notFound)
+                default:
+                    // Setidaknya satu request gagal karena jaringan: jangan anggap "tidak ada lirik".
+                    self?.finishFailed(key, track)
                 }
             }
         }
@@ -379,6 +427,46 @@ final class LyricsStore: ObservableObject {
             if result != .notFound { self.storeLyrics(result, for: key) }
             if self.currentKey == key { self.state = result }
         }
+    }
+
+    private func finishFailed(_ key: String, _ track: Track) {
+        DispatchQueue.main.async {
+            guard self.currentKey == key else { return }
+            self.state = .notFound
+            self.scheduleRetry(key)
+        }
+    }
+
+    // MARK: - Coba lagi
+
+    /// Coba lagi dengan jeda makin panjang (15, 30, 45 detik). Setelah itu hanya dicoba
+    /// lagi saat jaringan tersambung kembali.
+    private func scheduleRetry(_ key: String) {
+        if retryKey != key {
+            retryKey = key
+            retryAttempts = 0
+        }
+        retryAttempts += 1
+        retryWork?.cancel()
+        retryWork = nil
+        guard retryAttempts <= Self.maxTimedRetries else { return }
+        let work = DispatchWorkItem { [weak self] in self?.retryNow() }
+        retryWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryAttempts) * 15, execute: work)
+    }
+
+    private func retryNow() {
+        retryWork?.cancel()
+        retryWork = nil
+        guard let key = retryKey, key == currentKey, let t = currentTrack, state == .notFound else { return }
+        state = .loading
+        automaticFetch(t, key: key)
+    }
+
+    private func networkChanged(_ available: Bool) {
+        let cameBack = available && !networkAvailable
+        networkAvailable = available
+        if cameBack { retryNow() }
     }
 
     // MARK: - Pilih lirik manual
@@ -470,8 +558,22 @@ final class LyricsStore: ObservableObject {
         if !items.isEmpty { c.queryItems = items }
         guard let url = c.url else { return nil }
         var r = URLRequest(url: url, timeoutInterval: 10)
-        r.setValue("NotchLyrics/1.1 (macOS)", forHTTPHeaderField: "User-Agent")
+        r.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         return r
+    }
+
+    /// Versi dibaca dari Info.plist supaya tidak perlu diubah manual tiap rilis.
+    private static let userAgent: String = {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        return "NotchLyrics/\(version) (https://github.com/rezaprahenda/NotchLyrics)"
+    }()
+
+    /// 404 = lirik memang tidak ada. Status lain (5xx, 429) atau tanpa respons = gagal sementara.
+    private static func outcome(_ resp: URLResponse?, _ error: Error?) -> FetchOutcome? {
+        guard error == nil, let status = (resp as? HTTPURLResponse)?.statusCode else { return .failed }
+        if status == 404 { return .missing }
+        if status != 200 { return .failed }
+        return nil // 200: lanjut decode
     }
 
     private func fetchByID(_ id: Int, done: @escaping (LyricsState?) -> Void) {
@@ -486,46 +588,48 @@ final class LyricsStore: ObservableObject {
     }
 
     /// Pencarian presisi: judul + artis + album + durasi.
-    private func fetchExact(_ t: Track, done: @escaping (LyricsState?) -> Void) {
+    private func fetchExact(_ t: Track, done: @escaping (FetchOutcome) -> Void) {
         var items = [
             URLQueryItem(name: "track_name", value: t.title),
             URLQueryItem(name: "artist_name", value: t.artist),
         ]
         if !t.album.isEmpty { items.append(URLQueryItem(name: "album_name", value: t.album)) }
         if t.duration > 0 { items.append(URLQueryItem(name: "duration", value: String(Int(t.duration.rounded())))) }
-        guard let req = request("get", items) else { return done(nil) }
+        guard let req = request("get", items) else { return done(.missing) }
 
-        URLSession.shared.dataTask(with: req) { data, resp, _ in
-            guard let data,
-                  (resp as? HTTPURLResponse)?.statusCode == 200,
-                  let r = try? JSONDecoder().decode(LRCLibResult.self, from: data)
-            else { return done(nil) }
-            done(Self.state(from: r))
+        URLSession.shared.dataTask(with: req) { data, resp, error in
+            if let early = Self.outcome(resp, error) { return done(early) }
+            guard let data, let r = try? JSONDecoder().decode(LRCLibResult.self, from: data) else {
+                return done(.failed)
+            }
+            done(Self.state(from: r).map(FetchOutcome.found) ?? .missing)
         }.resume()
     }
 
     /// Cadangan: cari dengan judul yang sudah dibersihkan ("- Remastered", "(feat. ...)", dst).
-    private func fetchSearch(_ t: Track, done: @escaping (LyricsState?) -> Void) {
+    /// Hanya hasil yang durasinya dekat yang dipakai, supaya tidak menampilkan lirik lagu lain.
+    private func fetchSearch(_ t: Track, done: @escaping (FetchOutcome) -> Void) {
         let items = [
             URLQueryItem(name: "track_name", value: Self.clean(t.title)),
             URLQueryItem(name: "artist_name", value: Self.primaryArtist(t.artist)),
         ]
-        guard let req = request("search", items) else { return done(nil) }
+        guard let req = request("search", items) else { return done(.missing) }
 
-        URLSession.shared.dataTask(with: req) { data, _, _ in
-            guard let data,
-                  let results = try? JSONDecoder().decode([LRCLibResult].self, from: data),
-                  !results.isEmpty
-            else { return done(nil) }
-
-            let close = results.filter { r in
-                t.duration <= 0 || abs((r.duration ?? 0) - t.duration) <= 4
+        URLSession.shared.dataTask(with: req) { data, resp, error in
+            if let early = Self.outcome(resp, error) { return done(early) }
+            guard let data, let results = try? JSONDecoder().decode([LRCLibResult].self, from: data) else {
+                return done(.failed)
             }
-            let pool = close.isEmpty ? results : close
+
+            // Durasi tidak diketahui → terpaksa percaya hasil pencarian; selain itu wajib dekat.
+            let pool = t.duration <= 0 ? results : results.filter { r in
+                guard let d = r.duration else { return false }
+                return abs(d - t.duration) <= 4
+            }
             let best = pool.first { !($0.syncedLyrics ?? "").isEmpty }
                 ?? pool.first { !($0.plainLyrics ?? "").isEmpty }
                 ?? pool.first
-            done(best.flatMap(Self.state(from:)))
+            done(best.flatMap(Self.state(from:)).map(FetchOutcome.found) ?? .missing)
         }.resume()
     }
 
