@@ -1,0 +1,17 @@
+# Compile di Mac milik GitHub setiap push / PR, supaya error ketahuan tanpa build manual.
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15   # SDK macOS 15 dibutuhkan untuk Translation framework
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: xcrun swiftc --version
+      - name: Build
+        run: ./build.sh

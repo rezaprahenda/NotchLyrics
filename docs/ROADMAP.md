@@ -137,9 +137,20 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 
 ---
 
-## 8. Urutan rilis
+## 8. Prasyarat sebelum 2.0
 
-1. **1.2** (selesai, menunggu build & tes): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
+- **CI build** di setiap push (`.github/workflows/build.yml`) ✅
+- **Tes otomatis** untuk logika inti: parsing LRC, pencarian baris, aturan prioritas notch, jadwal salat (dicocokkan dengan jadwal resmi Kemenag beberapa kota).
+- **Migrasi ganti nama**: salin pengaturan (`UserDefaults`), cache lirik, offset, dan pilihan manual dari bundle ID lama ke yang baru; minta ulang izin Automation dengan penjelasan; daftarkan ulang "buka saat login".
+- **Fokus pada tema waktu**: lirik, fokus, salat lebih dulu. Catatan cepat & kamera cermin paling akhir.
+- **Menghormati konteks**: peek non-penting diam saat Focus/Jangan Ganggu aktif; suara adzan tidak berbunyi saat mikrofon dipakai; animasi disederhanakan saat Reduce Motion.
+- **Multi-layar & full screen**: aturan untuk monitor eksternal tanpa notch, mode clamshell, dan app full screen.
+- **Distribusi**: notarisasi Apple (akun Developer) supaya tidak perlu `xattr`; update otomatis via Sparkle.
+- **Refactor ke arsitektur modul** (§7) sebelum fitur salat & pomodoro masuk.
+
+## 9. Urutan rilis
+
+1. **1.2** (selesai, build & tes manual berhasil): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
 2. **1.3**: karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
 3. **2.0, nama baru**: arsitektur modul, jendela Pengaturan, Pomodoro, Salat & adzan (+mode Ramadan), Rak file, Baterai & AirPods.
 4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, kamera cermin, clipboard. Kalender nanti saja, kalau dibutuhkan.
