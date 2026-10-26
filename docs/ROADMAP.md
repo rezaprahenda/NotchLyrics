@@ -151,6 +151,6 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 ## 9. Urutan rilis
 
 1. **1.2** ✅ (build & tes manual berhasil): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
-2. **1.3** (dikerjakan di branch `dev`): karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
+2. **1.3** ✅: karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
 3. **2.0, nama baru**: arsitektur modul, jendela Pengaturan, Pomodoro, Salat & adzan (+mode Ramadan), Rak file, Baterai & AirPods.
 4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, kamera cermin, clipboard. Kalender nanti saja, kalau dibutuhkan.
