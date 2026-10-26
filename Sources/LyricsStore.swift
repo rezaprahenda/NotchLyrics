@@ -124,6 +124,24 @@ final class LyricsStore: ObservableObject {
     var hasRomanization: Bool { !romanized.isEmpty }
     private var romanizedSignature: String?
 
+    // MARK: Karaoke
+
+    /// Baris yang sedang dinyanyikan terisi dari kiri ke kanan.
+    @Published var karaokeEnabled: Bool = LyricsStore.storedBool("karaokeEnabled", false) {
+        didSet { UserDefaults.standard.set(karaokeEnabled, forKey: "karaokeEnabled") }
+    }
+
+    /// Seberapa jauh baris `index` sudah dinyanyikan (0…1).
+    func lineProgress(in lines: [LyricLine], index: Int, position: Double) -> Double {
+        guard lines.indices.contains(index) else { return 0 }
+        let t = position + Self.lookahead + offset
+        let start = lines[index].time
+        let end = index + 1 < lines.count ? lines[index + 1].time : start + 5
+        // Selesai sedikit sebelum baris berikutnya supaya terasa "habis" tepat waktu.
+        let length = max(end - start - 0.3, 0.3)
+        return min(max((t - start) / length, 0), 1)
+    }
+
     // MARK: Gaya baris ringkas
 
     @Published var compactStyle: CompactLyricStyle =

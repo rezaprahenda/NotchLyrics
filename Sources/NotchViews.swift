@@ -10,13 +10,12 @@ extension MusicSource {
     }
 }
 
-/// Bentuk notch: atas rata, sudut bawah membulat. Telinga kiri/kanan bisa "dipotong"
-/// (selebar `leftCut` / `rightCut`, setinggi `cutHeight`) supaya menu bar di bawahnya terlihat.
+/// Bentuk notch: atas rata, sudut bawah membulat. Sisi kiri/kanan bisa disembunyikan penuh
+/// (selebar `leftCut` / `rightCut`) supaya menu bar app di bawahnya terlihat dan bisa diklik.
 struct NotchShape: Shape {
     var radius: CGFloat
     var leftCut: CGFloat = 0
     var rightCut: CGFloat = 0
-    var cutHeight: CGFloat = 0
 
     var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>> {
         get { AnimatablePair(radius, AnimatablePair(leftCut, rightCut)) }
@@ -28,24 +27,14 @@ struct NotchShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        var path = UnevenRoundedRectangle(topLeadingRadius: 0,
-                                          bottomLeadingRadius: radius,
-                                          bottomTrailingRadius: radius,
-                                          topTrailingRadius: 0,
-                                          style: .continuous)
-            .path(in: rect)
-        guard cutHeight > 0 else { return path }
-        // Potongan dilebarkan ke atas & ke luar supaya hanya sudut dalamnya yang membulat.
-        let r: CGFloat = 6
-        if leftCut > 0.5 {
-            let cut = CGRect(x: rect.minX - r, y: rect.minY - r, width: leftCut + r, height: cutHeight + r)
-            path = path.subtracting(RoundedRectangle(cornerRadius: r, style: .continuous).path(in: cut))
-        }
-        if rightCut > 0.5 {
-            let cut = CGRect(x: rect.maxX - rightCut, y: rect.minY - r, width: rightCut + r, height: cutHeight + r)
-            path = path.subtracting(RoundedRectangle(cornerRadius: r, style: .continuous).path(in: cut))
-        }
-        return path
+        let r = CGRect(x: rect.minX + leftCut, y: rect.minY,
+                       width: max(rect.width - leftCut - rightCut, 0), height: rect.height)
+        return UnevenRoundedRectangle(topLeadingRadius: 0,
+                                      bottomLeadingRadius: radius,
+                                      bottomTrailingRadius: radius,
+                                      topTrailingRadius: 0,
+                                      style: .continuous)
+            .path(in: r)
     }
 }
 
@@ -64,8 +53,7 @@ struct NotchRootView: View {
         let radius = vm.cornerRadius(for: mode)
         let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
         let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
-        let shape = NotchShape(radius: radius, leftCut: leftCut, rightCut: rightCut,
-                               cutHeight: vm.notchSize.height)
+        let shape = NotchShape(radius: radius, leftCut: leftCut, rightCut: rightCut)
 
         // Saat kursor mendekati baris lirik (tembus klik), latar di bawah menu bar ikut memudar,
         // bukan hanya teksnya, supaya area di bawahnya terlihat jelas dan siap diklik.
@@ -136,7 +124,7 @@ struct CompactView: View {
                 ArtworkView(image: player.artwork, size: 20, corner: 5)
                 Spacer(minLength: vm.baseWidth)
                 EqualizerView(isPlaying: player.isPlaying,
-                              color: player.track?.source.tint ?? .white)
+                              color: vm.accent(for: player))
                     .frame(width: 20, height: 14)
             }
             .padding(.horizontal, 14)
@@ -144,17 +132,23 @@ struct CompactView: View {
 
             if showLine, let lines = lyrics.state.syncedLines {
                 // Berhenti berdetak saat musik di-pause, supaya tidak memakan CPU.
-                TimelineView(.animation(minimumInterval: 0.1, paused: !player.isPlaying)) { _ in
+                // Karaoke butuh gerakan halus, jadi detaknya lebih rapat.
+                TimelineView(.animation(minimumInterval: lyrics.karaokeEnabled ? 1.0 / 30 : 0.1,
+                                        paused: !player.isPlaying)) { _ in
                     let idx = lyrics.currentIndex(in: lines, position: player.position)
                     let original = idx.map { lines[$0].text } ?? ""
                     let texts: (primary: String, secondary: String?) = idx.map {
                         lyrics.compactText(id: lines[$0].id, original: original)
                     } ?? (primary: original, secondary: nil)
+                    let progress: Double? = (lyrics.karaokeEnabled && !texts.primary.isEmpty)
+                        ? idx.map { lyrics.lineProgress(in: lines, index: $0, position: player.position) }
+                        : nil
                     ZStack {
                         VStack(spacing: 1) {
-                            Text(texts.primary.isEmpty ? "♪" : texts.primary)
-                                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.92))
+                            KaraokeText(text: texts.primary.isEmpty ? "♪" : texts.primary,
+                                        progress: progress,
+                                        font: .system(size: 12.5, weight: .semibold, design: .rounded),
+                                        color: .white.opacity(0.92))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                             if let secondary = texts.secondary {
@@ -172,6 +166,9 @@ struct CompactView: View {
                     .animation(.easeOut(duration: 0.25), value: idx)
                 }
                 .padding(.horizontal, 16)
+                // Satu sisi disembunyikan → lirik pindah ke sisi yang tersisa.
+                .padding(.leading, vm.hiddenEar == .left ? vm.earWidth : 0)
+                .padding(.trailing, vm.hiddenEar == .right ? vm.earWidth : 0)
                 .frame(height: (lyrics.compactIsDouble ? vm.compactDoubleLyricHeight : vm.compactLyricHeight) - 4)
                 .clipped()
                 .opacity(vm.lyricLineSuppressed ? 0 : (vm.lyricLineFaded ? 0.15 : 1))
@@ -203,7 +200,7 @@ struct PeekView: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 8)
-                    EqualizerView(isPlaying: player.isPlaying, color: track.source.tint)
+                    EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
                         .frame(width: 20, height: 14)
                 }
                 .padding(.horizontal, 16)
@@ -238,7 +235,7 @@ struct ExpandedView: View {
                         HStack(spacing: 6) {
                             Text(track.source.displayName)
                                 .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(track.source.tint.opacity(0.9))
+                                .foregroundStyle(vm.accent(for: player).opacity(0.9))
                             SleepIndicator(player: player)
                         }
                     }
@@ -365,12 +362,46 @@ struct LyricsToolbar: View {
                 TranslateToggle(lyrics: lyrics)
             }
             if showOffset {
+                PillToggle(label: nil, symbol: "music.mic", isOn: lyrics.karaokeEnabled) {
+                    lyrics.karaokeEnabled.toggle()
+                }
+                .help(L("Karaoke: baris terisi mengikuti lagu", "Karaoke: fill lines as they are sung"))
                 OffsetControl(lyrics: lyrics)
             }
             PillToggle(label: nil, symbol: "text.magnifyingglass", isOn: lyrics.hasOverride) {
                 lyrics.isPickerOpen = true
             }
             .help(L("Pilih lirik lain", "Choose other lyrics"))
+        }
+    }
+}
+
+/// Teks yang terisi dari kiri ke kanan sesuai `progress` (0…1). `progress` nil = teks biasa.
+struct KaraokeText: View {
+    let text: String
+    let progress: Double?
+    let font: Font
+    let color: Color
+
+    var body: some View {
+        if let progress {
+            Text(text)
+                .font(font)
+                .foregroundStyle(color.opacity(0.4))
+                .overlay(alignment: .leading) {
+                    Text(text)
+                        .font(font)
+                        .foregroundStyle(color)
+                        .mask(alignment: .leading) {
+                            GeometryReader { g in
+                                Rectangle().frame(width: g.size.width * min(max(progress, 0), 1))
+                            }
+                        }
+                }
+        } else {
+            Text(text)
+                .font(font)
+                .foregroundStyle(color)
         }
     }
 }
@@ -529,11 +560,22 @@ struct SyncedLyricsView: View {
                             player.seek(to: line.time - lyrics.offset)
                         } label: {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(line.text.isEmpty ? "♪" : line.text)
-                                    .font(.system(size: isCurrent ? 16 : 13.5,
-                                                  weight: isCurrent ? .bold : .medium,
-                                                  design: .rounded))
-                                    .foregroundStyle(.white.opacity(isCurrent || isHovered ? 1 : (line.id < current ? 0.35 : 0.5)))
+                                let font = Font.system(size: isCurrent ? 16 : 13.5,
+                                                       weight: isCurrent ? .bold : .medium,
+                                                       design: .rounded)
+                                if isCurrent && lyrics.karaokeEnabled && !line.text.isEmpty {
+                                    TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !player.isPlaying)) { _ in
+                                        KaraokeText(text: line.text,
+                                                    progress: lyrics.lineProgress(in: lines, index: line.id,
+                                                                                  position: player.position),
+                                                    font: font,
+                                                    color: .white)
+                                    }
+                                } else {
+                                    Text(line.text.isEmpty ? "♪" : line.text)
+                                        .font(font)
+                                        .foregroundStyle(.white.opacity(isCurrent || isHovered ? 1 : (line.id < current ? 0.35 : 0.5)))
+                                }
                                 if lyrics.romanizationEnabled, let latin = lyrics.romanized[line.id] {
                                     Text(latin)
                                         .font(.system(size: isCurrent ? 13 : 12, weight: .medium, design: .rounded))

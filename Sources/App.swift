@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import ServiceManagement
+import Carbon.HIToolbox
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -22,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var chosenSleepMinutes = 0
     private var autoPauseItem: NSMenuItem?
     private var targetChoices: [NSMenuItem] = []
+    private var karaokeItem: NSMenuItem?
+    private var accentItem: NSMenuItem?
+    private var captureItem: NSMenuItem?
+    private var shortcutsItem: NSMenuItem?
     private var languageChoices: [NSMenuItem] = []
 
     static func main() {
@@ -41,6 +46,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         c.show()
         player.start()
         setupStatusItem()
+        applyShortcuts()
+    }
+
+    // MARK: - Shortcut keyboard
+
+    /// ⌃⌥L lirik ringkas on/off · ⌃⌥[ lirik lebih lambat · ⌃⌥] lirik lebih cepat.
+    private func applyShortcuts() {
+        HotKeyCenter.shared.unregisterAll()
+        guard controller?.vm.shortcutsEnabled ?? true else { return }
+        let mods = controlKey | optionKey
+        HotKeyCenter.shared.register(keyCode: kVK_ANSI_L, modifiers: mods) { [weak self] in
+            self?.toggleCompactLyrics()
+        }
+        HotKeyCenter.shared.register(keyCode: kVK_ANSI_LeftBracket, modifiers: mods) { [weak self] in
+            self?.lyrics.adjustOffset(by: -0.5)
+        }
+        HotKeyCenter.shared.register(keyCode: kVK_ANSI_RightBracket, modifiers: mods) { [weak self] in
+            self?.lyrics.adjustOffset(by: 0.5)
+        }
     }
 
     // Ikon kecil di menu bar: pengaturan + tombol keluar
@@ -74,6 +98,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         styleItem.submenu = styleMenu
         menu.addItem(styleItem)
         compactStyleItem = styleItem
+
+        let karaoke = NSMenuItem(title: L("Karaoke (baris terisi mengikuti lagu)", "Karaoke (lines fill as they are sung)"),
+                                 action: #selector(toggleKaraoke), keyEquivalent: "")
+        karaoke.target = self
+        karaoke.indentationLevel = 1
+        menu.addItem(karaoke)
+        karaokeItem = karaoke
 
         let clickThrough = NSMenuItem(title: L("Lirik tembus klik & memudar saat didekati", "Click-through lyrics that fade on approach"),
                                       action: #selector(toggleClickThrough),
@@ -109,6 +140,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         peek.target = self
         menu.addItem(peek)
         peekItem = peek
+
+        let accent = NSMenuItem(title: L("Warna mengikuti cover album", "Match colors to album art"),
+                                action: #selector(toggleAccent), keyEquivalent: "")
+        accent.target = self
+        menu.addItem(accent)
+        accentItem = accent
+
+        let capture = NSMenuItem(title: L("Sembunyikan saat share screen & rekam layar", "Hide during screen sharing & recording"),
+                                 action: #selector(toggleCapture), keyEquivalent: "")
+        capture.target = self
+        menu.addItem(capture)
+        captureItem = capture
+
+        let shortcuts = NSMenuItem(title: L("Shortcut keyboard (⌃⌥L, ⌃⌥[ ⌃⌥])", "Keyboard shortcuts (⌃⌥L, ⌃⌥[ ⌃⌥])"),
+                                   action: #selector(toggleShortcuts), keyEquivalent: "")
+        shortcuts.target = self
+        shortcuts.toolTip = L("⌃⌥L: lirik ringkas on/off · ⌃⌥[ / ⌃⌥]: geser waktu lirik",
+                              "⌃⌥L: compact lyrics on/off · ⌃⌥[ / ⌃⌥]: shift lyric timing")
+        menu.addItem(shortcuts)
+        shortcutsItem = shortcuts
 
         let autoPause = NSMenuItem(title: L("Pause otomatis app musik lain", "Auto-pause other music apps"),
                                    action: #selector(toggleAutoPause),
@@ -215,6 +266,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // "Sembunyikan setelah diklik" butuh tembus klik, karena kliknya harus sampai ke app di bawah.
         hideAfterClickItem?.isEnabled = compactOn && (vm?.lyricsClickThrough ?? true)
         peekItem?.state = (vm?.showTrackPeek ?? true) ? .on : .off
+        karaokeItem?.state = lyrics.karaokeEnabled ? .on : .off
+        karaokeItem?.isEnabled = compactOn
+        accentItem?.state = (vm?.accentFromArtwork ?? false) ? .on : .off
+        captureItem?.state = (vm?.hideFromScreenCapture ?? false) ? .on : .off
+        shortcutsItem?.state = (vm?.shortcutsEnabled ?? true) ? .on : .off
         autoPauseItem?.state = player.autoPauseOthers ? .on : .off
 
         compactStyleItem?.isEnabled = compactOn
@@ -296,6 +352,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case -1: player.setSleepAtTrackEnd()
         default: player.setSleepTimer(minutes: minutes)
         }
+        refreshMenuState()
+    }
+
+    @objc private func toggleKaraoke() {
+        lyrics.karaokeEnabled.toggle()
+        refreshMenuState()
+    }
+
+    @objc private func toggleAccent() {
+        controller?.vm.accentFromArtwork.toggle()
+        refreshMenuState()
+    }
+
+    @objc private func toggleCapture() {
+        controller?.vm.hideFromScreenCapture.toggle()
+        refreshMenuState()
+    }
+
+    @objc private func toggleShortcuts() {
+        controller?.vm.shortcutsEnabled.toggle()
+        applyShortcuts()
         refreshMenuState()
     }
 

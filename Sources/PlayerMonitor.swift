@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 enum MusicSource: String, CaseIterable {
     case spotify, music
@@ -55,7 +56,11 @@ private struct OSAResult {
 final class PlayerMonitor: ObservableObject {
     @Published private(set) var track: Track?
     @Published private(set) var isPlaying = false
-    @Published private(set) var artwork: NSImage?
+    @Published private(set) var artwork: NSImage? {
+        didSet { artworkColor = artwork?.accentColor().map { Color(nsColor: $0) } }
+    }
+    /// Warna aksen dari cover (nil kalau cover tidak ada / hampir abu-abu).
+    @Published private(set) var artworkColor: Color?
     @Published private(set) var permissionDenied: MusicSource?
     @Published private(set) var lastError: String?
     /// Volume app musik (0–100), bukan volume sistem.

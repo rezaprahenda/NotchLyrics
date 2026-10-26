@@ -49,6 +49,24 @@ final class NotchViewModel: ObservableObject {
     /// menu bar di atasnya, supaya menu app (mis. "Server" di Tableau) terlihat dan bisa diklik.
     @Published var hiddenEar: EarSide?
 
+    /// Warna equalizer & aksen mengikuti cover album (kalau tidak: warna app).
+    @Published var accentFromArtwork: Bool = NotchViewModel.storedBool("accentFromArtwork", false) {
+        didSet { UserDefaults.standard.set(accentFromArtwork, forKey: "accentFromArtwork") }
+    }
+    /// Notch tidak ikut terlihat di share screen, rekaman, dan screenshot.
+    @Published var hideFromScreenCapture: Bool = NotchViewModel.storedBool("hideFromScreenCapture", false) {
+        didSet { UserDefaults.standard.set(hideFromScreenCapture, forKey: "hideFromScreenCapture") }
+    }
+    /// Shortcut keyboard global (⌃⌥L, ⌃⌥[, ⌃⌥]).
+    @Published var shortcutsEnabled: Bool = NotchViewModel.storedBool("shortcutsEnabled", true) {
+        didSet { UserDefaults.standard.set(shortcutsEnabled, forKey: "shortcutsEnabled") }
+    }
+
+    func accent(for player: PlayerMonitor) -> Color {
+        if accentFromArtwork, let color = player.artworkColor { return color }
+        return player.track?.source.tint ?? .white
+    }
+
     private static func storedBool(_ key: String, _ defaultValue: Bool) -> Bool {
         (UserDefaults.standard.object(forKey: key) as? Bool) ?? defaultValue
     }
@@ -134,6 +152,7 @@ final class NotchController {
     private var peekWork: DispatchWorkItem?
     private var lastTrackKey: String?
     private var trackCancellable: AnyCancellable?
+    private var captureCancellable: AnyCancellable?
 
     init(player: PlayerMonitor, lyrics: LyricsStore) {
         self.player = player
@@ -201,6 +220,10 @@ final class NotchController {
         checkFrontWindow()
 
         // Notifikasi ganti lagu.
+        // Disembunyikan dari share screen / rekaman / screenshot kalau opsinya aktif.
+        captureCancellable = vm.$hideFromScreenCapture
+            .sink { [weak self] hide in self?.panel.sharingType = hide ? .none : .readOnly }
+
         trackCancellable = player.$track
             .removeDuplicates()
             .sink { [weak self] track in self?.trackChanged(track) }
@@ -281,38 +304,69 @@ final class NotchController {
         }
 
         var inside = mode != .hidden && activeRect.insetBy(dx: -4, dy: -4).contains(mouse)
-        if let ear = vm.hiddenEar, earRect(ear).contains(mouse) { inside = false }
+        if let ear = vm.hiddenEar, columnRect(ear).contains(mouse) { inside = false }
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }
         schedule(expand: inside)
     }
 
-    /// Area telinga di menu bar (koordinat layar). Dihitung dari ukuran mode ringkas,
-    /// jadi tetap sama walau telinganya sedang disembunyikan (tidak kedip-kedip).
+    /// Area telinga di menu bar (koordinat layar): pemicu menyembunyikan sisi itu.
     private func earRect(_ side: EarSide) -> NSRect {
-        let f = panel.frame
+        let column = columnRect(side)
         let bar = vm.notchSize.height
-        let fullWidth = vm.baseWidth + vm.earWidth * 2
-        let left = f.midX - fullWidth / 2
+        return NSRect(x: column.minX, y: column.maxY - bar, width: column.width, height: bar + 1)
+    }
+
+    /// Seluruh kolom sisi itu (telinga + bagian baris lirik di bawahnya), dihitung dari ukuran
+    /// mode ringkas penuh, jadi tetap sama walau sisinya sedang disembunyikan.
+    private func columnRect(_ side: EarSide) -> NSRect {
+        let f = panel.frame
+        let showLine = vm.showsLyricLine(lyrics.state)
+        let size = vm.size(for: .compact, showsLyricLine: showLine, doubleLine: lyrics.compactIsDouble)
+        let left = f.midX - size.width / 2
         switch side {
         case .left:
-            return NSRect(x: left - 8, y: f.maxY - bar, width: vm.earWidth + 8, height: bar + 1)
+            return NSRect(x: left - 8, y: f.maxY - size.height, width: vm.earWidth + 8, height: size.height + 1)
         case .right:
-            return NSRect(x: f.midX + vm.baseWidth / 2, y: f.maxY - bar, width: vm.earWidth + 8, height: bar + 1)
+            return NSRect(x: f.midX + vm.baseWidth / 2, y: f.maxY - size.height,
+                          width: vm.earWidth + 8, height: size.height + 1)
         }
     }
 
-    /// Sembunyikan hanya telinga yang kursornya ada di atasnya.
+    private var earWork: DispatchWorkItem?
+    private var pendingEar: EarSide??
+
+    /// Sembunyikan sisi yang telinganya didekati kursor; tetap tersembunyi selama kursor masih
+    /// di kolom sisi itu. Ada jeda kecil supaya tidak kedip saat kursor cuma lewat.
     private func updateEars(_ mouse: NSPoint) {
         var side: EarSide?
         if vm.mode(hasTrack: player.track != nil) == .compact {
-            if earRect(.left).contains(mouse) { side = .left }
-            else if earRect(.right).contains(mouse) { side = .right }
+            if let current = vm.hiddenEar, columnRect(current).contains(mouse) {
+                side = current
+            } else if earRect(.left).contains(mouse) {
+                side = .left
+            } else if earRect(.right).contains(mouse) {
+                side = .right
+            }
         }
-        if vm.hiddenEar != side {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { vm.hiddenEar = side }
+        guard vm.hiddenEar != side else {
+            earWork?.cancel()
+            earWork = nil
+            pendingEar = nil
+            return
         }
+        if let pending = pendingEar, pending == side { return }
+        earWork?.cancel()
+        pendingEar = .some(side)
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { self.vm.hiddenEar = side }
+            self.earWork = nil
+            self.pendingEar = nil
+        }
+        earWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + (side == nil ? 0.25 : 0.15), execute: work)
     }
 
     /// Tampilkan judul + artis sebentar saat lagu berganti (tidak saat app baru dibuka).
