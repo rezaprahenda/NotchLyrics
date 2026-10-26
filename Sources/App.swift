@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 import Carbon.HIToolbox
+import Combine
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -31,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     static func main() {
         let app = NSApplication.shared
+        Migration.runIfNeeded() // sebelum AppDelegate membuat objek yang membaca pengaturan
         let delegate = AppDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.accessory) // tanpa ikon di Dock
@@ -47,6 +49,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         player.start()
         setupStatusItem()
         applyShortcuts()
+        startFaces()
+    }
+
+    // MARK: - Ekspresi ikon menu bar
+
+    private var faceCancellable: AnyCancellable?
+    private var currentFace: MenuFace?
+    private var greeting = true
+
+    /// Berkedip sekali saat dibuka, lalu ekspresi mengikuti keadaan app.
+    private func startFaces() {
+        guard let vm = controller?.vm else { return }
+        setFace(.wink)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+            guard let self else { return }
+            self.greeting = false
+            self.refreshFace(playing: self.player.isPlaying, peeking: vm.isPeeking,
+                             sleepTimer: self.player.sleepUntil != nil || self.player.sleepAtTrackEnd)
+        }
+        faceCancellable = Publishers.CombineLatest4(player.$isPlaying, vm.$isPeeking,
+                                                    player.$sleepUntil, player.$sleepAtTrackEnd)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] playing, peeking, until, atEnd in
+                self?.refreshFace(playing: playing, peeking: peeking, sleepTimer: until != nil || atEnd)
+            }
+    }
+
+    private func refreshFace(playing: Bool, peeking: Bool, sleepTimer: Bool) {
+        guard !greeting else { return }
+        let face: MenuFace
+        if peeking {
+            face = .lookUp
+        } else if sleepTimer || !playing {
+            face = .sleep
+        } else {
+            face = .peek
+        }
+        setFace(face)
+    }
+
+    private func setFace(_ face: MenuFace) {
+        guard face != currentFace else { return }
+        currentFace = face
+        statusItem?.button?.image = face.image
     }
 
     // MARK: - Shortcut keyboard
@@ -70,8 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Ikon kecil di menu bar: pengaturan + tombol keluar
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "music.note.list",
-                                     accessibilityDescription: "NotchLyrics")
+        item.button?.image = MenuFace.wink.image
 
         let menu = NSMenu()
         menu.delegate = self
@@ -233,7 +278,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: L("Keluar NotchLyrics", "Quit NotchLyrics"),
+        let quitItem = NSMenuItem(title: L("Keluar popocu", "Quit popocu"),
                                   action: #selector(quitApp),
                                   keyEquivalent: "q")
         quitItem.target = self
@@ -439,7 +484,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         } catch {
             showAlert(title: L("Gagal mengubah pengaturan login", "Couldn't change the login setting"),
-                      message: "\(error.localizedDescription)\n\n" + L("Pastikan NotchLyrics sudah ada di folder Applications.", "Make sure NotchLyrics is in the Applications folder."))
+                      message: "\(error.localizedDescription)\n\n" + L("Pastikan popocu sudah ada di folder Applications.", "Make sure popocu is in the Applications folder."))
         }
         // macOS kadang minta persetujuan manual di Login Items.
         if service.status == .requiresApproval {

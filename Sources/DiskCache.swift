@@ -2,7 +2,7 @@ import Foundation
 
 /// Menyimpan lirik dan terjemahan ke disk supaya lagu yang pernah diputar langsung tampil
 /// (juga saat offline) setelah app dibuka ulang.
-/// Lokasi: ~/Library/Application Support/NotchLyrics/cache.json
+/// Lokasi: ~/Library/Application Support/popocu/cache.json
 final class DiskCache {
     private struct Store: Codable {
         var lyrics: [String: LyricsState] = [:]
@@ -22,7 +22,7 @@ final class DiskCache {
     init() {
         let fm = FileManager.default
         if let base = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let dir = base.appendingPathComponent("NotchLyrics", isDirectory: true)
+            let dir = base.appendingPathComponent("popocu", isDirectory: true)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             fileURL = dir.appendingPathComponent("cache.json")
         } else {

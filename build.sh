@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build NotchLyrics.app hanya dengan Command Line Tools (tanpa membuka Xcode).
+# Build popocu.app hanya dengan Command Line Tools (tanpa membuka Xcode).
 # Pakai:  ./build.sh          -> build saja
 #         ./build.sh run      -> build lalu jalankan dari folder build
 #         ./build.sh install  -> build, pasang ke /Applications, lalu jalankan
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="build/NotchLyrics.app"
+APP="build/popocu.app"
 ARCH="$(uname -m)"
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 
@@ -20,7 +20,7 @@ xcrun swiftc \
   -swift-version 5 \
   -sdk "$SDK" \
   -target "$ARCH-apple-macos14.0" \
-  -o "$APP/Contents/MacOS/NotchLyrics" \
+  -o "$APP/Contents/MacOS/popocu" \
   Sources/*.swift
 
 cp Info.plist "$APP/Contents/Info.plist"
@@ -46,15 +46,22 @@ echo "✓ Selesai: $(pwd)/$APP"
 
 case "${1:-}" in
   run)
-    pkill -x NotchLyrics 2>/dev/null || true
+    pkill -x popocu 2>/dev/null || true
+    pkill -x NotchLyrics 2>/dev/null || true # versi lama sebelum ganti nama
     open "$APP"
     ;;
   install)
+    pkill -x popocu 2>/dev/null || true
     pkill -x NotchLyrics 2>/dev/null || true
     sleep 0.5
-    rm -rf /Applications/NotchLyrics.app
+    # Versi lama (NotchLyrics) dipindah ke Trash, bukan dihapus, supaya bisa dikembalikan.
+    if [[ -d /Applications/NotchLyrics.app ]]; then
+      mv /Applications/NotchLyrics.app ~/.Trash/NotchLyrics-$(date +%s).app
+      echo "→ NotchLyrics lama dipindah ke Trash"
+    fi
+    rm -rf /Applications/popocu.app
     cp -R "$APP" /Applications/
-    echo "✓ Terpasang di /Applications/NotchLyrics.app"
-    open /Applications/NotchLyrics.app
+    echo "✓ Terpasang di /Applications/popocu.app"
+    open /Applications/popocu.app
     ;;
 esac

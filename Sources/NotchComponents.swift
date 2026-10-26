@@ -260,7 +260,7 @@ struct EmptyStateView: View {
             if let src = permissionDenied {
                 Text(L("Izin dibutuhkan untuk membaca \(src.displayName)", "Permission needed to read \(src.displayName)"))
                     .font(.system(size: 13, weight: .semibold))
-                Text(L("Buka System Settings › Privacy & Security › Automation, lalu aktifkan \(src.displayName) untuk NotchLyrics.", "Open System Settings › Privacy & Security › Automation and enable \(src.displayName) for NotchLyrics."))
+                Text(L("Buka System Settings › Privacy & Security › Automation, lalu aktifkan \(src.displayName) untuk popocu.", "Open System Settings › Privacy & Security › Automation and enable \(src.displayName) for popocu."))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
                     .multilineTextAlignment(.center)

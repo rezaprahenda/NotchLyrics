@@ -1,8 +1,9 @@
 # Roadmap & Rancangan Pengalaman
 
 Dokumen ini memetakan semua fitur yang direncanakan, di mana masing-masing tampil di notch,
-dan aturan supaya fitur-fitur itu tidak saling bertabrakan. Nama app masih sementara
-(kandidat: **Poni**, Alis, Pucuk, Atap).
+dan aturan supaya fitur-fitur itu tidak saling bertabrakan. Nama app: **popocu** (*poni poni lucu*),
+sebelumnya NotchLyrics. Ikon: wajah berpipi merona yang mengintip dari balik poni; ikon menu bar
+berganti ekspresi (mengintip, melirik ke atas, kedip, tidur, fokus).
 
 ---
 

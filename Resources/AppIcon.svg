@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <clipPath id="squircle"><rect x="100" y="100" width="824" height="824" rx="185" ry="185"/></clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="#f5b42a" filter="url(#shadow)"/>
+  <g clip-path="url(#squircle)">
+    <svg x="100" y="100" width="824" height="824" viewBox="0 0 96 96">
+      <path d="M16 0h64v20c0 10-4.7 18-10.7 18-5 0-8-4-10.6-8-2.6 4-5.6 8-10.7 8s-8.1-4-10.7-8c-2.6 4-5.7 8-10.6 8-6 0-10.7-8-10.7-18z" fill="#141414"/>
+      <ellipse cx="38" cy="58" rx="4.5" ry="6" fill="#141414"/>
+      <ellipse cx="58" cy="58" rx="4.5" ry="6" fill="#141414"/>
+      <ellipse cx="28" cy="70" rx="6" ry="3.5" fill="#ff6b57" opacity="0.85"/>
+      <ellipse cx="68" cy="70" rx="6" ry="3.5" fill="#ff6b57" opacity="0.85"/>
+      <path d="M43 70c3 3 7 3 10 0" fill="none" stroke="#141414" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>
+  </g>
+</svg>

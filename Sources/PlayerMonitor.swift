@@ -337,7 +337,7 @@ final class PlayerMonitor: ObservableObject {
                 // Tampilkan error app yang gagal dibaca, juga saat app lain masih terbaca,
                 // supaya kalau Music gagal kita tidak diam-diam menampilkan Spotify.
                 self.setError(errors.first)
-                if !errors.isEmpty { NSLog("NotchLyrics poll errors: %@", errors.joined(separator: " | ")) }
+                if !errors.isEmpty { NSLog("popocu poll errors: %@", errors.joined(separator: " | ")) }
                 self.apply(chosen)
 
                 // Jadwalkan poll rutin berikutnya.
@@ -387,7 +387,7 @@ final class PlayerMonitor: ObservableObject {
         }
 
         // Tepat satu app baru mulai memutar → pause app lain yang masih jalan.
-        // (Kalau lebih dari satu sekaligus, mis. saat NotchLyrics baru dibuka, jangan tebak-tebak.)
+        // (Kalau lebih dari satu sekaligus, mis. saat popocu baru dibuka, jangan tebak-tebak.)
         if autoPauseOthers, justStarted.count == 1, let starter = justStarted.first {
             for s in snaps where s.isPlaying && s.track.source != starter {
                 let other = s.track.source
@@ -465,7 +465,7 @@ final class PlayerMonitor: ObservableObject {
     private func setError(_ message: String?) {
         if lastError != message {
             lastError = message
-            if let message { NSLog("NotchLyrics: %@", message) }
+            if let message { NSLog("popocu: %@", message) }
         }
     }
 

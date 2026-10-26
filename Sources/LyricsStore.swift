@@ -615,7 +615,7 @@ final class LyricsStore: ObservableObject {
     /// Versi dibaca dari Info.plist supaya tidak perlu diubah manual tiap rilis.
     private static let userAgent: String = {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-        return "NotchLyrics/\(version) (https://github.com/rezaprahenda/NotchLyrics)"
+        return "popocu/\(version) (https://github.com/rezaprahenda/popocu)"
     }()
 
     /// 404 = lirik memang tidak ada. Status lain (5xx, 429) atau tanpa respons = gagal sementara.

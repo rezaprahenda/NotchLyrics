@@ -23,7 +23,7 @@ final class HotKeyCenter {
             refs.append(ref)
             handlers[id] = action
         } else {
-            NSLog("NotchLyrics: shortcut %d gagal didaftarkan (%d)", keyCode, status)
+            NSLog("popocu: shortcut %d gagal didaftarkan (%d)", keyCode, status)
         }
     }
 

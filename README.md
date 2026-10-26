@@ -1,15 +1,16 @@
 <p align="center">
-  <img src="Resources/AppIcon.png" width="128" alt="NotchLyrics icon">
+  <img src="Resources/AppIcon.png" width="128" alt="popocu icon">
 </p>
 
-<h1 align="center">NotchLyrics</h1>
+<h1 align="center">popocu</h1>
 
 <p align="center">
-  Time-synced lyrics in your MacBook's notch, for Spotify and Apple Music.
+  <i>poni poni lucu</i> — a cute companion that lives in your MacBook's notch.<br>
+  Time-synced lyrics for Spotify and Apple Music, with more to come.
 </p>
 
 <p align="center">
-  <img src="Resources/screenshot.png" width="640" alt="NotchLyrics expanded view with Japanese lyrics, romanization and translation">
+  <img src="Resources/screenshot.png" width="640" alt="popocu expanded view with Japanese lyrics, romanization and translation">
 </p>
 
 ---
@@ -35,13 +36,13 @@
 
 ### Download
 
-Grab `NotchLyrics.zip` from the [latest release](https://github.com/rezaprahenda/NotchLyrics/releases/latest),
-unzip it and move `NotchLyrics.app` to `/Applications`.
+Grab `popocu.zip` from the [latest release](https://github.com/rezaprahenda/popocu/releases/latest),
+unzip it and move `popocu.app` to `/Applications`.
 
 The app is not notarized, so macOS may say it "can't be opened" or "is damaged". Run this once:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/NotchLyrics.app
+xattr -dr com.apple.quarantine /Applications/popocu.app
 ```
 
 ### Build from source
@@ -50,13 +51,19 @@ Building requires the Xcode Command Line Tools.
 
 ```bash
 xcode-select --install          # if not installed yet
-git clone https://github.com/rezaprahenda/NotchLyrics.git
-cd NotchLyrics
+git clone https://github.com/rezaprahenda/popocu.git
+cd popocu
 ./build.sh install              # builds and copies the app to /Applications
 ```
 
-On first launch, allow NotchLyrics to control Spotify or Music when prompted.
+On first launch, allow popocu to control Spotify or Music when prompted.
 This permission is used only to read the current track and send playback commands.
+
+## Coming from NotchLyrics?
+
+popocu is the new name of NotchLyrics. `./build.sh install` moves the old app to the Trash, and your
+settings, lyric offsets, chosen lyrics and cache come along automatically. macOS will ask once more
+for permission to control Spotify or Music, and "Open at login" needs to be switched on again.
 
 ## Usage
 
@@ -66,7 +73,7 @@ This permission is used only to read the current track and send playback command
 
 ## Privacy
 
-NotchLyrics has no account, analytics or tracking. It sends the track title, artist,
+popocu has no account, analytics or tracking. It sends the track title, artist,
 album and duration to [LRCLIB](https://lrclib.net) to fetch lyrics, and to the iTunes
 Search API to fetch artwork when needed. Romanization and translation run on-device.
 
@@ -78,5 +85,5 @@ Lyrics are provided by [LRCLIB](https://lrclib.net), a free and open lyrics data
 
 Released under the [MIT License](LICENSE).
 
-NotchLyrics is an independent project and is not affiliated with Spotify or Apple.
+popocu is an independent project and is not affiliated with Spotify or Apple.
 Spotify and Apple Music are trademarks of their respective owners.

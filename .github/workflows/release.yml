@@ -1,4 +1,4 @@
-# Terbitkan Release baru di GitHub (mis. tag "v1.2") → app dibangun dan NotchLyrics.zip
+# Terbitkan Release baru di GitHub (mis. tag "v1.2") → app dibangun dan popocu.zip
 # otomatis dilampirkan ke Release itu.
 name: Release
 
@@ -17,7 +17,7 @@ jobs:
       - name: Build
         run: ./build.sh
       - name: Zip
-        run: ditto -c -k --keepParent build/NotchLyrics.app NotchLyrics.zip
+        run: ditto -c -k --keepParent build/popocu.app popocu.zip
       - uses: softprops/action-gh-release@v2
         with:
-          files: NotchLyrics.zip
+          files: popocu.zip
