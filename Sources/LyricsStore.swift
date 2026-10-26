@@ -2,12 +2,6 @@ import Foundation
 import Combine
 import Network
 
-struct LyricLine: Identifiable, Equatable, Codable {
-    let id: Int
-    let time: Double
-    let text: String
-}
-
 enum LyricsState: Equatable, Codable {
     case none
     case loading
@@ -133,13 +127,7 @@ final class LyricsStore: ObservableObject {
 
     /// Seberapa jauh baris `index` sudah dinyanyikan (0…1).
     func lineProgress(in lines: [LyricLine], index: Int, position: Double) -> Double {
-        guard lines.indices.contains(index) else { return 0 }
-        let t = position + Self.lookahead + offset
-        let start = lines[index].time
-        let end = index + 1 < lines.count ? lines[index + 1].time : start + 5
-        // Selesai sedikit sebelum baris berikutnya supaya terasa "habis" tepat waktu.
-        let length = max(end - start - 0.3, 0.3)
-        return min(max((t - start) / length, 0), 1)
+        LRC.progress(in: lines, index: index, at: position + Self.lookahead + offset)
     }
 
     // MARK: Gaya baris ringkas
@@ -713,58 +701,8 @@ final class LyricsStore: ObservableObject {
 
     // MARK: - Helpers
 
-    static func clean(_ title: String) -> String {
-        var t = title
-        if let r = t.range(of: " - ") { t = String(t[..<r.lowerBound]) }
-        t = t.replacingOccurrences(
-            of: #"\s*[\(\[](feat\.|ft\.|with |from |remaster)[^\)\]]*[\)\]]"#,
-            with: "",
-            options: [.regularExpression, .caseInsensitive]
-        )
-        return t.trimmingCharacters(in: .whitespaces)
-    }
-
-    static func primaryArtist(_ a: String) -> String {
-        a.components(separatedBy: CharacterSet(charactersIn: ",&"))
-            .first?
-            .trimmingCharacters(in: .whitespaces) ?? a
-    }
-
-    /// Parse format LRC: "[01:23.45] teks". Satu baris bisa punya beberapa timestamp.
-    static func parseLRC(_ s: String) -> [LyricLine] {
-        guard let regex = try? NSRegularExpression(pattern: #"\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]"#) else { return [] }
-        var out: [(Double, String)] = []
-        for raw in s.components(separatedBy: .newlines) {
-            let ns = raw as NSString
-            let matches = regex.matches(in: raw, range: NSRange(location: 0, length: ns.length))
-            guard let last = matches.last else { continue }
-            let text = ns.substring(from: last.range.location + last.range.length)
-                .trimmingCharacters(in: .whitespaces)
-            for m in matches {
-                let minutes = Double(ns.substring(with: m.range(at: 1))) ?? 0
-                let seconds = Double(ns.substring(with: m.range(at: 2)).replacingOccurrences(of: ":", with: ".")) ?? 0
-                out.append((minutes * 60 + seconds, text))
-            }
-        }
-        return out
-            .sorted { $0.0 < $1.0 }
-            .enumerated()
-            .map { LyricLine(id: $0.offset, time: $0.element.0, text: $0.element.1) }
-    }
-
-    /// Indeks baris terakhir yang waktunya <= posisi saat ini (binary search).
-    static func index(in lines: [LyricLine], at time: Double) -> Int? {
-        var lo = 0, hi = lines.count - 1
-        var ans: Int?
-        while lo <= hi {
-            let mid = (lo + hi) / 2
-            if lines[mid].time <= time {
-                ans = mid
-                lo = mid + 1
-            } else {
-                hi = mid - 1
-            }
-        }
-        return ans
-    }
+    static func clean(_ title: String) -> String { LRC.cleanTitle(title) }
+    static func primaryArtist(_ a: String) -> String { LRC.primaryArtist(a) }
+    static func parseLRC(_ s: String) -> [LyricLine] { LRC.parse(s) }
+    static func index(in lines: [LyricLine], at time: Double) -> Int? { LRC.index(in: lines, at: time) }
 }

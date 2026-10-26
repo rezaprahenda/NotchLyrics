@@ -13,5 +13,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Swift version
         run: xcrun swiftc --version
+      - name: Tes
+        run: ./test.sh
       - name: Build
         run: ./build.sh
