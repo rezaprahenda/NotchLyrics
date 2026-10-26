@@ -39,7 +39,9 @@ Pengaturan** (tab per modul), dan menu di menu bar tinggal berisi aksi cepat.
 ### Pemilik telinga (tertinggi → terendah)
 
 1. **Adzan sedang berlangsung** (selama ±10 menit sejak waktu salat masuk)
-2. **Pomodoro berjalan** → kiri 🍅 + ring progres, kanan sisa waktu
+2. **Pomodoro berjalan** → kiri 🍅 + ring progres, kanan sisa waktu.
+   Kalau musik juga diputar, keduanya digabung: **kiri = cover dengan ring progres pomodoro**,
+   **kanan = sisa waktu**, dan lirik tetap jalan di baris bawah.
 3. **Musik diputar** → kiri cover, kanan equalizer
 4. **Hitung mundur salat** (hanya saat < 15 menit lagi)
 5. Kosong (notch kembali seukuran notch fisik)
@@ -62,7 +64,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 | Kejadian | Efek ke modul lain |
 |---|---|
 | Waktu salat masuk | Pomodoro dijeda otomatis. Musik di-pause (opsi). Peek adzan (+suara, opsi). |
-| Pomodoro: fokus → istirahat | Musik pause/lanjut sesuai opsi. Peek "Istirahat 5 menit". |
+| Pomodoro: fokus → istirahat | Musik **tidak disentuh** (default). Opsi: pause saat istirahat, atau pause saat fokus. Peek "Istirahat 5 menit". |
 | Share screen / rekam layar | Semua permukaan disembunyikan (opsi). Event tetap dicatat. |
 | Jendela app penuh di bawah notch | Baris bawah disembunyikan (sudah ada). |
 | Kursor di atas telinga | Sisi itu (telinga + bagian baris di bawahnya) hilang. Konten pindah ke sisi lain. |
@@ -109,7 +111,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 | Ide | Nilai | Catatan |
 |---|---|---|
 | **Mode Ramadan**: imsak, hitung mundur buka puasa | ⭐⭐⭐ | Memakai ulang perhitungan jadwal salat |
-| **Rapat berikutnya** dari Kalender + tombol join (Zoom/Meet) | ⭐⭐⭐ | Butuh izin Kalender |
+| **Rapat berikutnya** dari Kalender + tombol join (Zoom/Meet) | ⭐ | Butuh izin Kalender. Belum dipakai pemilik; tunda |
 | **Tanggal Hijriah** di panel salat | ⭐⭐ | Kalender `islamicUmmAlQura` bawaan Foundation |
 | **Catatan cepat** (1 catatan tempel di panel) | ⭐⭐ | Simpel, berguna |
 | **Riwayat clipboard** (10 item) | ⭐⭐ | Hati-hati dengan password: lewati item dari password manager |
@@ -137,4 +139,4 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 1. **1.2** (selesai, menunggu build & tes): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
 2. **1.3**: karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
 3. **2.0, nama baru**: arsitektur modul, jendela Pengaturan, Pomodoro, Salat & adzan (+mode Ramadan), Rak file, Baterai & AirPods.
-4. **2.x**: Last.fm, Kalender, salin/bagikan lirik, catatan cepat, clipboard.
+4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, clipboard. Kalender nanti saja, kalau dibutuhkan.
