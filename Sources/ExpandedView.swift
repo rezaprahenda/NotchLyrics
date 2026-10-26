@@ -158,6 +158,14 @@ struct MusicPage: View {
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
 
+    private var showsLyricsToolbar: Bool {
+        if lyrics.isPickerOpen { return false }
+        switch lyrics.state {
+        case .synced, .plain: return true
+        default: return false
+        }
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             if let track = player.track {
@@ -179,7 +187,13 @@ struct MusicPage: View {
                         }
                     }
                     Spacer(minLength: 8)
-                    ControlsView(player: player)
+                    // Kontrol musik + tombol lirik di kanan, supaya tidak menutupi baris lirik.
+                    VStack(alignment: .trailing, spacing: 5) {
+                        ControlsView(player: player)
+                        if showsLyricsToolbar {
+                            LyricsToolbar(lyrics: lyrics, showOffset: lyrics.state.syncedLines != nil)
+                        }
+                    }
                 }
 
                 LyricsPanel(player: player, lyrics: lyrics)
@@ -525,9 +539,6 @@ struct LyricsPanel: View {
         switch lyrics.state {
         case .synced(let lines):
             SyncedLyricsView(lines: lines, player: player, lyrics: lyrics)
-                .overlay(alignment: .topTrailing) {
-                    LyricsToolbar(lyrics: lyrics, showOffset: true)
-                }
                 .overlay(alignment: .bottom) {
                     TranslationErrorNote(lyrics: lyrics)
                 }
@@ -558,7 +569,6 @@ struct LyricsPanel: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .overlay(alignment: .topTrailing) { LyricsToolbar(lyrics: lyrics, showOffset: false) }
             .overlay(alignment: .bottom) { TranslationErrorNote(lyrics: lyrics) }
         case .loading:
             message(L("Mencari lirik…", "Searching lyrics…"), withSearch: false)
@@ -593,7 +603,7 @@ struct LyricsPanel: View {
     }
 }
 
-/// Deretan tombol kecil di pojok kanan atas lirik: Aa, ID, offset, pilih lirik.
+/// Deretan tombol kecil lirik (di header, di bawah kontrol musik): Aa, terjemahan, karaoke, offset, pilih lirik.
 struct LyricsToolbar: View {
     @ObservedObject var lyrics: LyricsStore
     let showOffset: Bool

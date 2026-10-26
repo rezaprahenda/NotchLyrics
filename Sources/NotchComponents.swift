@@ -224,6 +224,9 @@ struct ArtworkView: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
+        // Garis tepi tipis: bentuk cover tetap terlihat walau gambarnya berpinggiran hitam.
+        .overlay(RoundedRectangle(cornerRadius: corner, style: .continuous)
+            .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5))
     }
 }
 
