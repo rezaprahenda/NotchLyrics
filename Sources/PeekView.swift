@@ -47,7 +47,7 @@ struct PeekView: View {
 
     private func eventRow(_ peek: PeekEvent) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: symbol(for: peek))
+            Image(systemName: peek.symbol.isEmpty ? symbol(for: peek) : peek.symbol)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(tint(for: peek))
                 .frame(width: 24)

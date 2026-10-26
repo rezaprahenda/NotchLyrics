@@ -8,9 +8,10 @@ final class SettingsWindowController {
     private var window: NSWindow?
 
     func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule,
-              prayer: PrayerModule) {
+              prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule) {
         if window == nil {
-            let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
+            let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
+                                    shelf: shelf, device: device)
             let host = NSHostingController(rootView: view)
             let w = NSWindow(contentViewController: host)
             w.title = L("Pengaturan popocu", "popocu Settings")
@@ -41,10 +42,12 @@ struct SettingsView: View {
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
     @ObservedObject var prayer: PrayerModule
+    @ObservedObject var shelf: ShelfModule
+    @ObservedObject var device: DeviceModule
 
     var body: some View {
         TabView {
-            GeneralSettings(vm: vm, player: player, lyrics: lyrics)
+            GeneralSettings(vm: vm, player: player, lyrics: lyrics, shelf: shelf, device: device)
                 .tabItem { Label(L("Umum", "General"), systemImage: "gearshape") }
             MusicSettings(vm: vm, lyrics: lyrics)
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
@@ -63,6 +66,8 @@ struct GeneralSettings: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
+    @ObservedObject var shelf: ShelfModule
+    @ObservedObject var device: DeviceModule
     @State private var language = AppLanguage.current
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var confirmClear = false
@@ -107,6 +112,13 @@ struct GeneralSettings: View {
 
             Section(L("Musik", "Music")) {
                 Toggle(L("Pause otomatis app musik lain", "Auto-pause other music apps"), isOn: $player.autoPauseOthers)
+            }
+
+            Section(L("Rak file & perangkat", "Shelf & devices")) {
+                Toggle(L("Rak file (seret file ke notch)", "File shelf (drag files onto the notch)"), isOn: $shelf.enabled)
+                Toggle(L("Notifikasi charger & baterai lemah", "Charger & low battery banners"), isOn: $device.batteryAlerts)
+                Toggle(L("Notifikasi headphone Bluetooth tersambung", "Bluetooth headphones connected banner"),
+                       isOn: $device.audioAlerts)
             }
 
             Section {

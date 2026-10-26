@@ -153,6 +153,10 @@ final class NotchController {
     private let lyrics: LyricsStore
     private let pomodoro: PomodoroModule
     private let prayer: PrayerModule
+    private let shelf: ShelfModule
+    private let device: DeviceModule
+    /// changeCount papan seret saat tombol mouse ditekan; berubah = sedang menyeret sesuatu.
+    private var dragStartChangeCount = NSPasteboard(name: .drag).changeCount
 
     private var monitors: [Any] = []
     private var hoverTimer: Timer?
@@ -174,11 +178,14 @@ final class NotchController {
     /// Musik di-pause oleh pomodoro (bukan oleh pengguna) → boleh dilanjutkan otomatis.
     private var pausedByPomodoro = false
 
-    init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule) {
+    init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule,
+         shelf: ShelfModule, device: DeviceModule) {
         self.player = player
         self.lyrics = lyrics
         self.pomodoro = pomodoro
         self.prayer = prayer
+        self.shelf = shelf
+        self.device = device
 
         let size = NotchViewModel.windowSize
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -196,7 +203,7 @@ final class NotchController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = true
 
-        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
+        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -307,6 +314,7 @@ final class NotchController {
 
     private func updateHover() {
         let mouse = NSEvent.mouseLocation
+        checkFileDrag(mouse)
         updateEars(mouse)
         let z = zones()
 
@@ -426,6 +434,8 @@ final class NotchController {
         vm.dismissPeek = { [weak self] in self?.dismissPeek() }
         pomodoro.onEvent = { [weak self] event in self?.handlePomodoro(event) }
         prayer.onEvent = { [weak self] event in self?.handlePrayer(event) }
+        device.onPeek = { [weak self] event in self?.post(event) }
+        device.start()
 
         player.$isPlaying
             .removeDuplicates()
@@ -444,9 +454,11 @@ final class NotchController {
             .sink { [weak self] in self?.refreshOwner() }
             .store(in: &ownerCancellables)
 
-        Publishers.Merge3(prayer.$now.map { _ in () },
+        Publishers.Merge5(prayer.$now.map { _ in () },
                           prayer.$today.map { _ in () },
-                          prayer.$enabled.map { _ in () })
+                          prayer.$enabled.map { _ in () },
+                          shelf.$items.map { _ in () },
+                          shelf.$enabled.map { _ in () })
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.refreshOwner() }
             .store(in: &ownerCancellables)
@@ -458,6 +470,7 @@ final class NotchController {
         s.isPlaying = player.isPlaying
         s.pausedFor = pausedAt.map { Date().timeIntervalSince($0) } ?? 0
         s.pomodoroRunning = pomodoro.isActive
+        s.shelfItems = shelf.enabled ? shelf.items.count : 0
         if prayer.enabled {
             let now = Date()
             s.minutesSincePrayer = prayer.minutesSinceLast(at: now)
@@ -608,7 +621,27 @@ final class NotchController {
     }
 
     /// Klik di zona baris lirik → sembunyikan liriknya beberapa detik (timer diulang tiap klik).
+    /// File diseret mendekati notch → buka panel penuh di halaman Rak sebagai target drop.
+    private func checkFileDrag(_ mouse: NSPoint) {
+        guard shelf.enabled, !vm.isExpanded, NSEvent.pressedMouseButtons & 1 != 0 else { return }
+        let pasteboard = NSPasteboard(name: .drag)
+        guard pasteboard.changeCount != dragStartChangeCount,
+              pasteboard.types?.contains(.fileURL) == true else { return }
+        let f = panel.frame
+        let zone = NSRect(x: f.midX - 220, y: f.maxY - vm.notchSize.height - 50,
+                          width: 440, height: vm.notchSize.height + 50)
+        guard zone.contains(mouse) else { return }
+        pending?.cancel()
+        pending = nil
+        pendingExpand = nil
+        vm.expandedPage = .shelf
+        dismissPeek()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { vm.isExpanded = true }
+        panel.ignoresMouseEvents = false
+    }
+
     private func handleClick() {
+        dragStartChangeCount = NSPasteboard(name: .drag).changeCount
         let seconds = vm.hideAfterClickSeconds
         guard seconds > 0 else { return }
         // Pakai zona baris lirik walau sedang disembunyikan, supaya klik berikutnya

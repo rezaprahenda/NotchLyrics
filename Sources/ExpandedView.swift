@@ -1,17 +1,19 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Expanded
 
 /// Halaman panel penuh (satu per modul).
 enum ExpandedPage: String, CaseIterable {
-    case music, focus, prayer
+    case music, focus, prayer, shelf
 
     var title: String {
         switch self {
         case .music: return L("Musik", "Music")
         case .focus: return L("Fokus", "Focus")
         case .prayer: return L("Salat", "Prayer")
+        case .shelf: return L("Rak", "Shelf")
         }
     }
 
@@ -20,6 +22,7 @@ enum ExpandedPage: String, CaseIterable {
         case .music: return "music.note"
         case .focus: return "timer"
         case .prayer: return "moon.stars"
+        case .shelf: return "tray"
         }
     }
 }
@@ -30,6 +33,7 @@ struct ExpandedView: View {
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
     @ObservedObject var prayer: PrayerModule
+    @ObservedObject var shelf: ShelfModule
 
     /// Hanya modul yang aktif yang punya tab.
     private var pages: [ExpandedPage] {
@@ -38,6 +42,7 @@ struct ExpandedView: View {
             case .music: return true
             case .focus: return pomodoro.enabled
             case .prayer: return prayer.enabled
+            case .shelf: return shelf.enabled
             }
         }
     }
@@ -63,6 +68,8 @@ struct ExpandedView: View {
                 FocusPage(pomodoro: pomodoro)
             case .prayer:
                 PrayerPage(prayer: prayer)
+            case .shelf:
+                ShelfPage(shelf: shelf)
             }
         }
         .padding(.horizontal, 20)
@@ -149,6 +156,107 @@ struct MusicPage: View {
             } else {
                 EmptyStateView(permissionDenied: player.permissionDenied, error: player.lastError)
             }
+        }
+    }
+}
+
+// MARK: - Halaman Rak
+
+struct ShelfPage: View {
+    @ObservedObject var shelf: ShelfModule
+    @State private var targeted = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ScrollView(.vertical, showsIndicators: false) {
+                if shelf.items.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "tray.and.arrow.down")
+                            .font(.system(size: 22))
+                            .foregroundStyle(Color.shelfAccent)
+                        Text(L("Seret file ke notch untuk dititipkan di sini.", "Drag files onto the notch to keep them here."))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 120)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
+                        ForEach(shelf.items, id: \.self) { url in
+                            ShelfChip(url: url, shelf: shelf)
+                        }
+                    }
+                    .padding(10)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.shelfAccent.opacity(targeted ? 0.95 : 0.45),
+                              style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
+            .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.shelfAccent.opacity(targeted ? 0.12 : 0)))
+            .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
+                for provider in providers {
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url else { return }
+                        DispatchQueue.main.async { shelf.add([url]) }
+                    }
+                }
+                return true
+            }
+
+            HStack(spacing: 8) {
+                PeekButton(title: "AirDrop", filled: true, tint: .shelfAccent) { shelf.airDrop() }
+                    .disabled(shelf.items.isEmpty)
+                    .opacity(shelf.items.isEmpty ? 0.5 : 1)
+                PeekButton(title: L("Kosongkan", "Clear"), filled: false, tint: .shelfAccent) { shelf.clear() }
+                    .disabled(shelf.items.isEmpty)
+                Spacer()
+                Text(L("Seret keluar untuk memindahkan", "Drag out to move"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+        }
+        .onAppear { shelf.pruneMissing() }
+    }
+}
+
+/// Satu file di Rak: bisa diseret keluar, diklik untuk dibuka, atau dihapus dari rak.
+struct ShelfChip: View {
+    let url: URL
+    @ObservedObject var shelf: ShelfModule
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                .resizable()
+                .frame(width: 22, height: 22)
+            Text(url.lastPathComponent)
+                .font(.system(size: 11.5))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+            if hovering {
+                Button { shelf.remove(url) } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L("Hapus dari rak", "Remove from shelf"))
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.white.opacity(hovering ? 0.16 : 0.1)))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture(count: 2) { shelf.open(url) }
+        .onDrag { NSItemProvider(contentsOf: url) ?? NSItemProvider() }
+        .help(url.path)
+        .contextMenu {
+            Button(L("Buka", "Open")) { shelf.open(url) }
+            Button(L("Tampilkan di Finder", "Show in Finder")) { shelf.reveal(url) }
+            Button(L("Hapus dari rak", "Remove from shelf")) { shelf.remove(url) }
         }
     }
 }

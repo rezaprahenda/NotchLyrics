@@ -14,6 +14,8 @@ enum EarOwner: Equatable {
     case prayerSoon
     /// Musik sudah di-pause lama, tidak ada yang lebih penting.
     case musicIdle
+    /// Ada file di Rak, tidak ada yang lebih penting: telinga menampilkan jumlahnya.
+    case shelf
     /// Tidak ada apa-apa: notch kembali seukuran notch fisik.
     case none
 }
@@ -29,6 +31,7 @@ struct NotchSituation: Equatable {
     var minutesSincePrayer: Double?
     /// Menit menuju waktu salat berikutnya (nil = modul mati).
     var minutesToPrayer: Double?
+    var shelfItems = 0
 }
 
 enum NotchPriority {
@@ -42,6 +45,7 @@ enum NotchPriority {
         if s.hasTrack && (s.isPlaying || s.pausedFor < musicIdleAfter) { return .music }
         if let to = s.minutesToPrayer, to >= 0, to < prayerSoonWindow { return .prayerSoon }
         if s.hasTrack { return .musicIdle }
+        if s.shelfItems > 0 { return .shelf }
         return .none
     }
 }
@@ -77,6 +81,8 @@ struct PeekEvent: Equatable {
     let createdAt: Date
     var title = ""
     var subtitle = ""
+    /// Nama SF Symbol (kosong = ikon bawaan jenisnya).
+    var symbol = ""
 }
 
 /// Satu peek tampil pada satu waktu; sisanya antre (maks. 3) menurut prioritas.

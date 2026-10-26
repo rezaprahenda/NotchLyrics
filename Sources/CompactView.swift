@@ -9,6 +9,7 @@ struct CompactView: View {
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
     @ObservedObject var prayer: PrayerModule
+    @ObservedObject var shelf: ShelfModule
     let showLine: Bool
 
     var body: some View {
@@ -86,7 +87,12 @@ struct CompactView: View {
     private var isPrayerOwner: Bool { vm.earOwner == .prayerNow || vm.earOwner == .prayerSoon }
 
     @ViewBuilder private var leftEar: some View {
-        if isPrayerOwner {
+        if vm.earOwner == .shelf {
+            Image(systemName: "tray.full")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.shelfAccent)
+                .frame(width: 20, height: 20)
+        } else if isPrayerOwner {
             Image(systemName: vm.earOwner == .prayerNow ? "moon.stars.fill" : "moon.stars")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.prayerAccent)
@@ -112,7 +118,12 @@ struct CompactView: View {
     }
 
     @ViewBuilder private var rightEar: some View {
-        if isPrayerOwner {
+        if vm.earOwner == .shelf {
+            Text("\(shelf.items.count)")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.shelfAccent)
+                .fixedSize()
+        } else if isPrayerOwner {
             Text(prayerText)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .monospacedDigit()

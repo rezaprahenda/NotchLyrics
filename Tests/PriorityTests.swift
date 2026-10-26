@@ -35,6 +35,16 @@ func priorityTests() {
         expectEqual(NotchPriority.earOwner(onlyPrayer), .prayerSoon, "hanya salat dekat")
         onlyPrayer.minutesToPrayer = 40
         expectEqual(NotchPriority.earOwner(onlyPrayer), .none, "salat masih jauh")
+
+        var shelf = NotchSituation()
+        shelf.shelfItems = 2
+        expectEqual(NotchPriority.earOwner(shelf), .shelf, "hanya ada file di rak")
+        shelf.hasTrack = true
+        shelf.isPlaying = true
+        expectEqual(NotchPriority.earOwner(shelf), .music, "musik mengalahkan rak")
+        shelf.isPlaying = false
+        shelf.pausedFor = 600
+        expectEqual(NotchPriority.earOwner(shelf), .musicIdle, "musik yang lama di-pause tetap di atas rak")
     }
 }
 
