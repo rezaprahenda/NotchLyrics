@@ -1,9 +1,10 @@
-# Push tag "v1.2" (dst) → GitHub membangun app dan melampirkan NotchLyrics.zip di Releases.
+# Terbitkan Release baru di GitHub (mis. tag "v1.2") → app dibangun dan NotchLyrics.zip
+# otomatis dilampirkan ke Release itu.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  release:
+    types: [published]
 
 permissions:
   contents: write
@@ -20,4 +21,3 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: NotchLyrics.zip
-          generate_release_notes: true
