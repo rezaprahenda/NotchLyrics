@@ -152,6 +152,7 @@ final class NotchController {
     private let player: PlayerMonitor
     private let lyrics: LyricsStore
     private let pomodoro: PomodoroModule
+    private let prayer: PrayerModule
 
     private var monitors: [Any] = []
     private var hoverTimer: Timer?
@@ -173,10 +174,11 @@ final class NotchController {
     /// Musik di-pause oleh pomodoro (bukan oleh pengguna) → boleh dilanjutkan otomatis.
     private var pausedByPomodoro = false
 
-    init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule) {
+    init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule) {
         self.player = player
         self.lyrics = lyrics
         self.pomodoro = pomodoro
+        self.prayer = prayer
 
         let size = NotchViewModel.windowSize
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -194,7 +196,7 @@ final class NotchController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = true
 
-        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
+        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -315,8 +317,8 @@ final class NotchController {
             // Peek tembus klik; hanya strip setinggi menu bar yang interaktif...
             let strip = NSRect(x: z.full.minX, y: panel.frame.maxY - vm.notchSize.height,
                                width: z.full.width, height: vm.notchSize.height)
-            if vm.activePeek?.kind == .pomodoro {
-                // ...kecuali peek pomodoro yang punya tombol: bisa diklik, tapi tidak membuka panel penuh.
+            if peekHasButtons {
+                // ...kecuali peek yang punya tombol: bisa diklik, tapi tidak membuka panel penuh.
                 activeRect = z.full
                 expandAllowed = strip.insetBy(dx: -4, dy: -4).contains(mouse)
             } else {
@@ -423,6 +425,7 @@ final class NotchController {
     private func startCoordinator() {
         vm.dismissPeek = { [weak self] in self?.dismissPeek() }
         pomodoro.onEvent = { [weak self] event in self?.handlePomodoro(event) }
+        prayer.onEvent = { [weak self] event in self?.handlePrayer(event) }
 
         player.$isPlaying
             .removeDuplicates()
@@ -440,6 +443,13 @@ final class NotchController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.refreshOwner() }
             .store(in: &ownerCancellables)
+
+        Publishers.Merge3(prayer.$now.map { _ in () },
+                          prayer.$today.map { _ in () },
+                          prayer.$enabled.map { _ in () })
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.refreshOwner() }
+            .store(in: &ownerCancellables)
     }
 
     private func refreshOwner() {
@@ -448,6 +458,16 @@ final class NotchController {
         s.isPlaying = player.isPlaying
         s.pausedFor = pausedAt.map { Date().timeIntervalSince($0) } ?? 0
         s.pomodoroRunning = pomodoro.isActive
+        if prayer.enabled {
+            let now = Date()
+            s.minutesSincePrayer = prayer.minutesSinceLast(at: now)
+            s.minutesToPrayer = prayer.minutesToNext(at: now)
+            // Mode Ramadan: hitung mundur berbuka tampil satu jam sebelum Maghrib.
+            if prayer.isRamadan, prayer.next(after: now)?.prayer == .maghrib,
+               let to = s.minutesToPrayer, to <= 60 {
+                s.minutesToPrayer = min(to, NotchPriority.prayerSoonWindow - 1)
+            }
+        }
         let owner = NotchPriority.earOwner(s)
         if vm.earOwner != owner {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { vm.earOwner = owner }
@@ -484,7 +504,7 @@ final class NotchController {
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             // Peek dengan tombol tetap terbuka selama kursor di atasnya.
-            if self.vm.activePeek?.kind == .pomodoro, self.zones().full.contains(NSEvent.mouseLocation) {
+            if self.peekHasButtons, self.zones().full.contains(NSEvent.mouseLocation) {
                 self.schedulePeekEnd(after: 2)
                 return
             }
@@ -492,6 +512,15 @@ final class NotchController {
         }
         peekWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+    }
+
+    /// Peek pomodoro & adzan punya tombol, jadi harus bisa diklik.
+    private var peekHasButtons: Bool {
+        switch vm.activePeek?.kind {
+        case .pomodoro?: return true
+        case .prayer?: return prayer.adhanSound != .off
+        default: return false
+        }
     }
 
     private func dismissPeek() {
@@ -525,6 +554,38 @@ final class NotchController {
             post(PeekEvent(kind: .pomodoro, id: "pomodoro", createdAt: Date(), title: title, subtitle: subtitle))
         case .reminder(let title, let subtitle):
             post(PeekEvent(kind: .reminder, id: title, createdAt: Date(), title: title, subtitle: subtitle))
+        }
+    }
+
+    // MARK: - Salat
+
+    private func handlePrayer(_ event: PrayerEvent) {
+        switch event {
+        case .arrived(.imsak):
+            post(PeekEvent(kind: .prayer, id: "imsak", createdAt: Date(), title: "Imsak",
+                           subtitle: L("Waktunya berhenti sahur", "Time to stop eating")))
+        case .arrived(let p):
+            var notes: [String] = []
+            if !prayer.placeName.isEmpty { notes.append(prayer.placeName) }
+            if prayer.pausePomodoroAtAdhan, pomodoro.phase != .idle, !pomodoro.isPaused {
+                pomodoro.pause()
+                notes.append(L("pomodoro dijeda", "pomodoro paused"))
+            }
+            if prayer.pauseMusicAtAdhan, player.isPlaying {
+                player.pause()
+                notes.append(L("musik dijeda", "music paused"))
+            }
+            let title = p == .maghrib && prayer.isRamadan
+                ? L("Waktu Maghrib — selamat berbuka", "Maghrib — time to break the fast")
+                : L("Waktu \(p.title)", "\(p.title) time")
+            post(PeekEvent(kind: .prayer, id: p.rawValue, createdAt: Date(), title: title,
+                           subtitle: notes.joined(separator: " · ")))
+        case .upcoming(let p, let minutes):
+            // Tanpa musik, hitung mundur sudah tampil di telinga; peek hanya saat musik diputar.
+            guard player.isPlaying else { return }
+            post(PeekEvent(kind: .reminder, id: "pre-\(p.rawValue)", createdAt: Date(),
+                           title: L("\(p.title) \(minutes) menit lagi", "\(p.title) in \(minutes) minutes"),
+                           subtitle: prayer.placeName))
         }
     }
 

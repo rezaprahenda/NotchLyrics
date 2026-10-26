@@ -24,6 +24,10 @@
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocationUsageDescription</key>
+    <string>popocu memakai lokasi perkiraan untuk menghitung jadwal salat di kotamu. Jadwal dihitung di Mac ini; nama kota dicari lewat layanan peta Apple.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>popocu memakai lokasi perkiraan untuk menghitung jadwal salat di kotamu. Jadwal dihitung di Mac ini; nama kota dicari lewat layanan peta Apple.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>popocu membaca lagu yang sedang diputar di Spotify atau Apple Music untuk menampilkan lirik dan kontrol musik.</string>
 </dict>

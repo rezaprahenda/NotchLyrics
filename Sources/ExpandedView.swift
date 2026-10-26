@@ -5,12 +5,13 @@ import AppKit
 
 /// Halaman panel penuh (satu per modul).
 enum ExpandedPage: String, CaseIterable {
-    case music, focus
+    case music, focus, prayer
 
     var title: String {
         switch self {
         case .music: return L("Musik", "Music")
         case .focus: return L("Fokus", "Focus")
+        case .prayer: return L("Salat", "Prayer")
         }
     }
 
@@ -18,6 +19,7 @@ enum ExpandedPage: String, CaseIterable {
         switch self {
         case .music: return "music.note"
         case .focus: return "timer"
+        case .prayer: return "moon.stars"
         }
     }
 }
@@ -27,10 +29,17 @@ struct ExpandedView: View {
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
 
     /// Hanya modul yang aktif yang punya tab.
     private var pages: [ExpandedPage] {
-        ExpandedPage.allCases.filter { $0 != .focus || pomodoro.enabled }
+        ExpandedPage.allCases.filter {
+            switch $0 {
+            case .music: return true
+            case .focus: return pomodoro.enabled
+            case .prayer: return prayer.enabled
+            }
+        }
     }
 
     private var page: ExpandedPage {
@@ -52,6 +61,8 @@ struct ExpandedView: View {
                 MusicPage(vm: vm, player: player, lyrics: lyrics)
             case .focus:
                 FocusPage(pomodoro: pomodoro)
+            case .prayer:
+                PrayerPage(prayer: prayer)
             }
         }
         .padding(.horizontal, 20)
@@ -139,6 +150,95 @@ struct MusicPage: View {
                 EmptyStateView(permissionDenied: player.permissionDenied, error: player.lastError)
             }
         }
+    }
+}
+
+// MARK: - Halaman Salat
+
+struct PrayerPage: View {
+    @ObservedObject var prayer: PrayerModule
+
+    private var rows: [Prayer] {
+        let base: [Prayer] = [.fajr, .sunrise, .dhuhr, .asr, .maghrib, .isha]
+        return prayer.isRamadan ? [.imsak] + base : base
+    }
+
+    var body: some View {
+        if prayer.today.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "location.slash")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.prayerAccent)
+                Text(prayer.locationDenied
+                     ? L("Izin lokasi ditolak. Pilih kota di Pengaturan › Salat.",
+                         "Location access is off. Choose a city in Settings › Prayer.")
+                     : L("Menunggu lokasi… atau pilih kota di Pengaturan › Salat.",
+                         "Waiting for location… or choose a city in Settings › Prayer."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                if !prayer.locationDenied {
+                    PeekButton(title: L("Izinkan lokasi", "Allow location"), filled: true, tint: .prayerAccent) {
+                        prayer.refreshLocation()
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(prayer.placeName.isEmpty ? L("Lokasi", "Location") : prayer.placeName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(1)
+                    Text(L("Kemenag · \(prayer.locationMode == .automatic ? "otomatis" : "manual")",
+                           "Kemenag · \(prayer.locationMode == .automatic ? "automatic" : "manual")"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                    Text(prayer.hijriDate)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                    Spacer(minLength: 6)
+                    if let next = prayer.next(after: prayer.now) {
+                        Text(countdown(to: next.time))
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.prayerAccent)
+                        Text(next.prayer == .maghrib && prayer.isRamadan
+                             ? L("menuju berbuka", "until iftar")
+                             : L("menuju \(next.prayer.title)", "until \(next.prayer.title)"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+                }
+                .frame(width: 150, alignment: .leading)
+
+                VStack(spacing: 2) {
+                    let next = prayer.next(after: prayer.now)?.prayer
+                    ForEach(rows, id: \.self) { p in
+                        let isNext = p == next
+                        HStack {
+                            Text(p.title)
+                            Spacer()
+                            Text(prayer.timeText(prayer.today[p]))
+                                .monospacedDigit()
+                        }
+                        .font(.system(size: 13, weight: isNext ? .semibold : .regular))
+                        .foregroundStyle(isNext ? Color.prayerAccent : .white.opacity(p.isObligatory ? 0.9 : 0.55))
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(isNext ? Color.prayerAccent.opacity(0.16) : .clear))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func countdown(to date: Date) -> String {
+        let minutes = max(Int((date.timeIntervalSince(prayer.now) / 60).rounded(.up)), 0)
+        let h = minutes / 60, m = minutes % 60
+        return h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) menit", "\(m) min")
     }
 }
 

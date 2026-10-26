@@ -7,6 +7,7 @@ struct PeekView: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,6 +72,12 @@ struct PeekView: View {
                 }
                 PeekButton(title: L("Lewati", "Skip"), filled: false, tint: tint(for: peek)) {
                     pomodoro.skipNext()
+                    vm.dismissPeek?()
+                }
+            }
+            if peek.kind == .prayer, prayer.adhanSound != .off {
+                PeekButton(title: L("Matikan suara", "Mute"), filled: true, tint: tint(for: peek)) {
+                    prayer.stopAdhan()
                     vm.dismissPeek?()
                 }
             }

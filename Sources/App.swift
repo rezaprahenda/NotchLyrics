@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let player = PlayerMonitor()
     private let lyrics = LyricsStore()
     private let pomodoro = PomodoroModule()
+    private let prayer = PrayerModule()
     private var controller: NotchController?
     private var statusItem: NSStatusItem?
     private let settingsWindow = SettingsWindowController()
@@ -35,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         lyrics.bind(to: player)
-        let c = NotchController(player: player, lyrics: lyrics, pomodoro: pomodoro)
+        let c = NotchController(player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
         controller = c
         c.show()
         player.start()
@@ -271,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSettings() {
         guard let vm = controller?.vm else { return }
-        settingsWindow.show(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
+        settingsWindow.show(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
     }
 
     @objc private func quitApp() {

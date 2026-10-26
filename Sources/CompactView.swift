@@ -8,6 +8,7 @@ struct CompactView: View {
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
     let showLine: Bool
 
     var body: some View {
@@ -82,8 +83,15 @@ struct CompactView: View {
 
     // MARK: Telinga
 
+    private var isPrayerOwner: Bool { vm.earOwner == .prayerNow || vm.earOwner == .prayerSoon }
+
     @ViewBuilder private var leftEar: some View {
-        if vm.earOwner == .pomodoro {
+        if isPrayerOwner {
+            Image(systemName: vm.earOwner == .prayerNow ? "moon.stars.fill" : "moon.stars")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.prayerAccent)
+                .frame(width: 20, height: 20)
+        } else if vm.earOwner == .pomodoro {
             TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
                 ZStack {
                     ProgressRing(progress: pomodoro.phase == .idle ? 1 : pomodoro.progress(at: ctx.date),
@@ -104,7 +112,14 @@ struct CompactView: View {
     }
 
     @ViewBuilder private var rightEar: some View {
-        if vm.earOwner == .pomodoro {
+        if isPrayerOwner {
+            Text(prayerText)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(Color.prayerAccent)
+                .lineLimit(1)
+                .fixedSize()
+        } else if vm.earOwner == .pomodoro {
             Group {
                 if let next = pomodoro.waitingFor {
                     Text(next.isBreak ? L("rehat?", "break?") : L("fokus?", "focus?"))
@@ -124,5 +139,17 @@ struct CompactView: View {
             EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
                 .frame(width: 20, height: 14)
         }
+    }
+
+    /// "Ashar 14m", "Buka 42m" (Ramadan), atau "Ashar" saat waktunya baru masuk.
+    private var prayerText: String {
+        let now = prayer.now
+        if vm.earOwner == .prayerNow, let last = prayer.last(before: now) {
+            return last.prayer.title
+        }
+        guard let next = prayer.next(after: now) else { return "" }
+        let minutes = max(Int((next.time.timeIntervalSince(now) / 60).rounded(.up)), 0)
+        let label = next.prayer == .maghrib && prayer.isRamadan ? L("Buka", "Iftar") : next.prayer.title
+        return "\(label) \(minutes)m"
     }
 }

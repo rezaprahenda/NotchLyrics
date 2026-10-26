@@ -45,6 +45,7 @@ struct NotchRootView: View {
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
 
     var body: some View {
         let mode = vm.mode()
@@ -84,13 +85,13 @@ struct NotchRootView: View {
 
             switch mode {
             case .expanded:
-                ExpandedView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
+                ExpandedView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             case .compact:
-                CompactView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, showLine: showLine)
+                CompactView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, showLine: showLine)
                     .transition(.opacity)
             case .peek:
-                PeekView(vm: vm, player: player, pomodoro: pomodoro)
+                PeekView(vm: vm, player: player, pomodoro: pomodoro, prayer: prayer)
                     .transition(.opacity)
             case .idle, .hidden:
                 EmptyView()

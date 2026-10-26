@@ -1,14 +1,16 @@
 import SwiftUI
 import AppKit
 import ServiceManagement
+import UniformTypeIdentifiers
 
 /// Jendela Pengaturan (menggantikan menu panjang di menu bar).
 final class SettingsWindowController {
     private var window: NSWindow?
 
-    func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule) {
+    func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule,
+              prayer: PrayerModule) {
         if window == nil {
-            let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
+            let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer)
             let host = NSHostingController(rootView: view)
             let w = NSWindow(contentViewController: host)
             w.title = L("Pengaturan popocu", "popocu Settings")
@@ -38,6 +40,7 @@ struct SettingsView: View {
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
 
     var body: some View {
         TabView {
@@ -47,6 +50,8 @@ struct SettingsView: View {
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
             FocusSettings(pomodoro: pomodoro)
                 .tabItem { Label(L("Fokus", "Focus"), systemImage: "timer") }
+            PrayerSettings(prayer: prayer)
+                .tabItem { Label(L("Salat", "Prayer"), systemImage: "moon.stars") }
         }
         .frame(width: 520, height: 470)
     }
@@ -222,5 +227,106 @@ struct FocusSettings: View {
             .disabled(!pomodoro.enabled)
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - Salat
+
+struct PrayerSettings: View {
+    @ObservedObject var prayer: PrayerModule
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(L("Aktifkan jadwal salat & adzan", "Enable prayer times & adhan"), isOn: $prayer.enabled)
+                Text(L("Dihitung di Mac ini dengan metode Kemenag RI (Subuh 20°, Isya 18°, ihtiyat 2 menit).",
+                       "Calculated on this Mac using the Indonesian Ministry of Religious Affairs method (Fajr 20°, Isha 18°)."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(L("Lokasi", "Location")) {
+                Picker(L("Sumber lokasi", "Location source"), selection: $prayer.locationMode) {
+                    Text(L("Otomatis (lokasi Mac)", "Automatic (Mac location)")).tag(PrayerLocationMode.automatic)
+                    Text(L("Pilih kota", "Choose a city")).tag(PrayerLocationMode.manual)
+                }
+                if prayer.locationMode == .manual {
+                    Picker(L("Kota", "City"), selection: $prayer.manualCityID) {
+                        ForEach(PrayerCity.all) { Text($0.name).tag($0.id) }
+                    }
+                } else {
+                    HStack {
+                        Text(prayer.placeName.isEmpty ? L("Belum ada lokasi", "No location yet") : prayer.placeName)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(L("Perbarui", "Refresh")) { prayer.refreshLocation() }
+                    }
+                    if prayer.locationDenied {
+                        HStack {
+                            Text(L("Izin lokasi ditolak.", "Location access is off."))
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            Button(L("Buka Pengaturan Sistem", "Open System Settings")) {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .disabled(!prayer.enabled)
+
+            Section(L("Adzan", "Adhan")) {
+                Picker(L("Suara", "Sound"), selection: $prayer.adhanSound) {
+                    ForEach(AdhanSound.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                if prayer.adhanSound == .file {
+                    HStack {
+                        Text(prayer.adhanFilePath.isEmpty
+                             ? L("Belum ada file", "No file chosen")
+                             : (prayer.adhanFilePath as NSString).lastPathComponent)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer()
+                        Button(L("Pilih…", "Choose…")) { chooseFile() }
+                    }
+                }
+                HStack {
+                    Text(L("Tidak berbunyi saat mikrofon sedang dipakai (rapat/telepon).",
+                           "Stays silent while the microphone is in use (calls/meetings)."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(L("Coba", "Test")) { prayer.playAdhan() }
+                        .disabled(prayer.adhanSound == .off)
+                }
+                Toggle(L("Pengingat 15 & 5 menit sebelumnya", "Reminders 15 & 5 minutes before"), isOn: $prayer.preAlerts)
+                Toggle(L("Jeda pomodoro saat adzan", "Pause pomodoro at adhan"), isOn: $prayer.pausePomodoroAtAdhan)
+                Toggle(L("Pause musik saat adzan", "Pause music at adhan"), isOn: $prayer.pauseMusicAtAdhan)
+            }
+            .disabled(!prayer.enabled)
+
+            Section(L("Ramadan", "Ramadan")) {
+                Picker(L("Mode Ramadan", "Ramadan mode"), selection: $prayer.ramadanMode) {
+                    ForEach(RamadanMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                Text(L("Menampilkan Imsak dan hitung mundur berbuka satu jam sebelum Maghrib.",
+                       "Shows Imsak and an iftar countdown during the hour before Maghrib."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .disabled(!prayer.enabled)
+        }
+        .formStyle(.grouped)
+    }
+
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.audio]
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            prayer.adhanFilePath = url.path
+        }
     }
 }
