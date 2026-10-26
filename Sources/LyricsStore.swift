@@ -38,10 +38,10 @@ enum CompactLyricStyle: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .original: return "Teks asli"
-        case .latin: return "Latin (romanisasi)"
-        case .translation: return "Terjemahan"
-        case .latinTranslation: return "Latin + terjemahan"
+        case .original: return L("Teks asli", "Original")
+        case .latin: return L("Latin (romanisasi)", "Latin (romanized)")
+        case .translation: return L("Terjemahan", "Translation")
+        case .latinTranslation: return L("Latin + terjemahan", "Latin + translation")
         }
     }
 
@@ -134,7 +134,30 @@ final class LyricsStore: ObservableObject {
         }
     }
 
-    // MARK: Terjemahan (ke bahasa Indonesia, lewat Translation framework macOS 15+)
+    // MARK: Terjemahan (lewat Translation framework macOS 15+)
+
+    /// Bahasa target yang bisa dipilih di menu.
+    static let translationTargets = ["id", "en", "ja", "ko", "zh-Hans", "es", "fr", "de"]
+
+    @Published var translationTarget: String =
+        UserDefaults.standard.string(forKey: "translationTarget") ?? (AppLanguage.isIndonesian ? "id" : "en") {
+        didSet {
+            guard translationTarget != oldValue else { return }
+            UserDefaults.standard.set(translationTarget, forKey: "translationTarget")
+            translations = [:]
+            translationRequestedKey = nil
+            translationStatus = .idle
+            requestTranslation()
+        }
+    }
+
+    /// Kunci cache terjemahan: lagu + bahasa target.
+    var translationKey: String? { currentKey.map { "\($0)#\(translationTarget)" } }
+
+    var alreadyTranslatedMessage: String {
+        let name = languageName(translationTarget)
+        return L("Lirik sudah berbahasa \(name)", "Lyrics are already in \(name)")
+    }
 
     /// Tampilkan terjemahan di mode lebar (tombol "ID").
     @Published var translationEnabled: Bool = LyricsStore.storedBool("translationEnabled", false) {
@@ -252,13 +275,34 @@ final class LyricsStore: ObservableObject {
 
     private func storeLyrics(_ state: LyricsState?, for key: String) {
         cache[key] = state
-        if state == nil { translationCache[key] = nil }
+        if state == nil { clearTranslations(forTrack: key) }
         disk.setLyrics(state, for: key)
     }
 
-    private func storeTranslation(_ map: [Int: String]?, for key: String) {
-        translationCache[key] = map
-        disk.setTranslation(map, for: key)
+    private func storeTranslation(_ map: [Int: String], for translationKey: String) {
+        translationCache[translationKey] = map
+        disk.setTranslation(map, for: translationKey)
+    }
+
+    private func clearTranslations(forTrack key: String) {
+        for k in Array(translationCache.keys) where k == key || k.hasPrefix(key + "#") {
+            translationCache[k] = nil
+        }
+        disk.removeTranslations(forTrack: key)
+    }
+
+    /// Kosongkan cache lirik & terjemahan, lalu muat ulang lagu yang sedang diputar.
+    /// Pilihan lirik manual dan offset tetap disimpan.
+    func clearCache() {
+        disk.clearAll()
+        cache = [:]
+        translationCache = [:]
+        romanizedSignature = nil
+        translationRequestedKey = nil
+        translations = [:]
+        let track = currentTrack
+        currentKey = nil
+        load(for: track)
     }
 
     // MARK: - Romanisasi
@@ -289,7 +333,7 @@ final class LyricsStore: ObservableObject {
 
     /// Dipanggil saat lirik / lagu / pengaturan berubah.
     private func requestTranslation() {
-        guard wantsTranslation, let key = currentKey, !translatableLines.isEmpty else {
+        guard wantsTranslation, let key = translationKey, !translatableLines.isEmpty else {
             if !translations.isEmpty { translations = [:] }
             if translationStatus != .idle { translationStatus = .idle }
             translationRequestedKey = nil
@@ -297,7 +341,7 @@ final class LyricsStore: ObservableObject {
         }
         if let cached = translationCache[key] {
             if translations != cached { translations = cached }
-            translationStatus = cached.isEmpty ? .failed("Lirik sudah berbahasa Indonesia") : .done
+            translationStatus = cached.isEmpty ? .failed(alreadyTranslatedMessage) : .done
             translationRequestedKey = key
             return
         }
@@ -314,10 +358,10 @@ final class LyricsStore: ObservableObject {
     }
 
     func applyTranslations(_ map: [Int: String], key: String) {
-        guard key == currentKey, wantsTranslation else { return }
+        guard key == translationKey, wantsTranslation else { return }
         storeTranslation(map, for: key)
         translations = map
-        translationStatus = map.isEmpty ? .failed("Lirik sudah berbahasa Indonesia") : .done
+        translationStatus = map.isEmpty ? .failed(alreadyTranslatedMessage) : .done
     }
 
     // MARK: - Offset (disimpan per lagu)
@@ -531,7 +575,7 @@ final class LyricsStore: ObservableObject {
 
         let newState = Self.state(synced: c.synced, plain: c.plain, instrumental: c.instrumental) ?? .notFound
         if newState != .notFound { storeLyrics(newState, for: key) }
-        storeTranslation(nil, for: key)
+        clearTranslations(forTrack: key)
         romanizedSignature = nil
         isPickerOpen = false
         state = newState

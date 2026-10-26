@@ -10,22 +10,42 @@ extension MusicSource {
     }
 }
 
-/// Bentuk notch: atas rata, sudut bawah membulat.
+/// Bentuk notch: atas rata, sudut bawah membulat. Telinga kiri/kanan bisa "dipotong"
+/// (selebar `leftCut` / `rightCut`, setinggi `cutHeight`) supaya menu bar di bawahnya terlihat.
 struct NotchShape: Shape {
     var radius: CGFloat
+    var leftCut: CGFloat = 0
+    var rightCut: CGFloat = 0
+    var cutHeight: CGFloat = 0
 
-    var animatableData: CGFloat {
-        get { radius }
-        set { radius = newValue }
+    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>> {
+        get { AnimatablePair(radius, AnimatablePair(leftCut, rightCut)) }
+        set {
+            radius = newValue.first
+            leftCut = newValue.second.first
+            rightCut = newValue.second.second
+        }
     }
 
     func path(in rect: CGRect) -> Path {
-        UnevenRoundedRectangle(topLeadingRadius: 0,
-                               bottomLeadingRadius: radius,
-                               bottomTrailingRadius: radius,
-                               topTrailingRadius: 0,
-                               style: .continuous)
+        var path = UnevenRoundedRectangle(topLeadingRadius: 0,
+                                          bottomLeadingRadius: radius,
+                                          bottomTrailingRadius: radius,
+                                          topTrailingRadius: 0,
+                                          style: .continuous)
             .path(in: rect)
+        guard cutHeight > 0 else { return path }
+        // Potongan dilebarkan ke atas & ke luar supaya hanya sudut dalamnya yang membulat.
+        let r: CGFloat = 6
+        if leftCut > 0.5 {
+            let cut = CGRect(x: rect.minX - r, y: rect.minY - r, width: leftCut + r, height: cutHeight + r)
+            path = path.subtracting(RoundedRectangle(cornerRadius: r, style: .continuous).path(in: cut))
+        }
+        if rightCut > 0.5 {
+            let cut = CGRect(x: rect.maxX - rightCut, y: rect.minY - r, width: rightCut + r, height: cutHeight + r)
+            path = path.subtracting(RoundedRectangle(cornerRadius: r, style: .continuous).path(in: cut))
+        }
+        return path
     }
 }
 
@@ -42,13 +62,17 @@ struct NotchRootView: View {
         let doubleLine = lyrics.compactIsDouble
         let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: doubleLine)
         let radius = vm.cornerRadius(for: mode)
+        let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
+        let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
+        let shape = NotchShape(radius: radius, leftCut: leftCut, rightCut: rightCut,
+                               cutHeight: vm.notchSize.height)
 
         // Saat kursor mendekati baris lirik (tembus klik), latar di bawah menu bar ikut memudar,
         // bukan hanya teksnya, supaya area di bawahnya terlihat jelas dan siap diklik.
         let lowerOpacity: Double = (mode == .compact && vm.lyricLineFaded) ? 0.12 : 1
 
         ZStack(alignment: .top) {
-            NotchShape(radius: radius)
+            shape
                 .fill(Color.black)
                 .mask(alignment: .top) {
                     // Gradasi halus dari pekat (menu bar) ke transparan (baris lirik), tanpa garis potong.
@@ -84,12 +108,13 @@ struct NotchRootView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .clipShape(NotchShape(radius: radius))
+        .clipShape(shape)
         .shadow(color: .black.opacity(mode == .expanded ? 0.35 : 0), radius: 12, y: 4)
         .opacity(mode == .hidden ? 0 : 1)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: mode)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: showLine)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: doubleLine)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: vm.hiddenEar)
         .frame(width: NotchViewModel.windowSize.width,
                height: NotchViewModel.windowSize.height,
                alignment: .top)
@@ -107,17 +132,14 @@ struct CompactView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Saat telinga disusutkan, isinya tidak dirender supaya tidak memaksa lebar view.
             HStack(spacing: 0) {
-                if !vm.earsHidden {
-                    ArtworkView(image: player.artwork, size: 20, corner: 5)
-                    Spacer(minLength: vm.baseWidth)
-                    EqualizerView(isPlaying: player.isPlaying,
-                                  color: player.track?.source.tint ?? .white)
-                        .frame(width: 20, height: 14)
-                }
+                ArtworkView(image: player.artwork, size: 20, corner: 5)
+                Spacer(minLength: vm.baseWidth)
+                EqualizerView(isPlaying: player.isPlaying,
+                              color: player.track?.source.tint ?? .white)
+                    .frame(width: 20, height: 14)
             }
-            .padding(.horizontal, vm.earsHidden ? 0 : 14)
+            .padding(.horizontal, 14)
             .frame(height: vm.notchSize.height)
 
             if showLine, let lines = lyrics.state.syncedLines {
@@ -267,7 +289,7 @@ struct LyricsPanel: View {
         case .plain(let lines):
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Lirik tidak tersinkron")
+                    Text(L("Lirik tidak tersinkron", "Lyrics not synced"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.white.opacity(0.4))
                     ForEach(Array(lines.enumerated()), id: \.offset) { item in
@@ -294,11 +316,11 @@ struct LyricsPanel: View {
             .overlay(alignment: .topTrailing) { LyricsToolbar(lyrics: lyrics, showOffset: false) }
             .overlay(alignment: .bottom) { TranslationErrorNote(lyrics: lyrics) }
         case .loading:
-            message("Mencari lirik…", withSearch: false)
+            message(L("Mencari lirik…", "Searching lyrics…"), withSearch: false)
         case .instrumental:
             message("♪ Instrumental", withSearch: true)
         case .notFound, .none:
-            message("Lirik tidak tersedia untuk lagu ini", withSearch: true)
+            message(L("Lirik tidak tersedia untuk lagu ini", "No lyrics available for this song"), withSearch: true)
         }
     }
 
@@ -311,7 +333,7 @@ struct LyricsPanel: View {
                 Button {
                     lyrics.isPickerOpen = true
                 } label: {
-                    Label("Cari lirik lain", systemImage: "magnifyingglass")
+                    Label(L("Cari lirik lain", "Find other lyrics"), systemImage: "magnifyingglass")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.85))
                         .padding(.horizontal, 10)
@@ -337,7 +359,7 @@ struct LyricsToolbar: View {
                 PillToggle(label: "Aa", symbol: nil, isOn: lyrics.romanizationEnabled) {
                     lyrics.romanizationEnabled.toggle()
                 }
-                .help("Tampilkan huruf latin (romanisasi)")
+                .help(L("Tampilkan huruf latin (romanisasi)", "Show romanization"))
             }
             if #available(macOS 15.0, *) {
                 TranslateToggle(lyrics: lyrics)
@@ -348,7 +370,7 @@ struct LyricsToolbar: View {
             PillToggle(label: nil, symbol: "text.magnifyingglass", isOn: lyrics.hasOverride) {
                 lyrics.isPickerOpen = true
             }
-            .help("Pilih lirik lain")
+            .help(L("Pilih lirik lain", "Choose other lyrics"))
         }
     }
 }
@@ -390,12 +412,12 @@ struct LyricsPickerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Text("Pilih lirik")
+                Text(L("Pilih lirik", "Choose lyrics"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.8))
                 Spacer()
                 if lyrics.hasOverride {
-                    Button("Kembali ke otomatis") { lyrics.resetToAutomatic() }
+                    Button(L("Kembali ke otomatis", "Back to automatic")) { lyrics.resetToAutomatic() }
                         .buttonStyle(.plain)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
@@ -417,7 +439,7 @@ struct LyricsPickerView: View {
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if lyrics.candidates.isEmpty {
-                Text("Tidak ada hasil lain di LRCLIB")
+                Text(L("Tidak ada hasil lain di LRCLIB", "No other results on LRCLIB"))
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.5))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -460,7 +482,7 @@ struct CandidateRow: View {
                 Text(format(candidate.duration))
                     .font(.system(size: 10, weight: .medium).monospacedDigit())
                     .foregroundStyle(durationMatches ? Color.green.opacity(0.85) : Color.white.opacity(0.45))
-                Text(candidate.hasSynced ? "Sinkron" : (candidate.instrumental ? "Instrumental" : "Teks"))
+                Text(candidate.hasSynced ? L("Sinkron", "Synced") : (candidate.instrumental ? "Instrumental" : L("Teks", "Text")))
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundStyle(.white.opacity(candidate.hasSynced ? 0.95 : 0.6))
                     .padding(.horizontal, 6)
@@ -598,7 +620,7 @@ struct OffsetControl: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
         .background(Capsule().fill(Color.white.opacity(0.08)))
-        .help("+ = lirik lebih cepat, − = lebih lambat. Klik angka untuk reset.")
+        .help(L("+ = lirik lebih cepat, − = lebih lambat. Klik angka untuk reset.", "+ = lyrics earlier, − = later. Click the number to reset."))
     }
 
     private var label: String {
@@ -746,10 +768,10 @@ struct SleepIndicator: View {
     }
 
     private func label(now: Date) -> String {
-        if player.sleepAtTrackEnd { return "akhir lagu" }
+        if player.sleepAtTrackEnd { return L("akhir lagu", "end of song") }
         guard let until = player.sleepUntil else { return "" }
         let minutes = max(1, Int((until.timeIntervalSince(now) / 60).rounded(.up)))
-        return "\(minutes) mnt"
+        return L("\(minutes) mnt", "\(minutes) min")
     }
 }
 
@@ -831,16 +853,16 @@ struct EmptyStateView: View {
                 .font(.system(size: 22))
                 .foregroundStyle(.white.opacity(0.6))
             if let src = permissionDenied {
-                Text("Izin dibutuhkan untuk membaca \(src.displayName)")
+                Text(L("Izin dibutuhkan untuk membaca \(src.displayName)", "Permission needed to read \(src.displayName)"))
                     .font(.system(size: 13, weight: .semibold))
-                Text("Buka System Settings › Privacy & Security › Automation, lalu aktifkan \(src.displayName) untuk NotchLyrics.")
+                Text(L("Buka System Settings › Privacy & Security › Automation, lalu aktifkan \(src.displayName) untuk NotchLyrics.", "Open System Settings › Privacy & Security › Automation and enable \(src.displayName) for NotchLyrics."))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
                     .multilineTextAlignment(.center)
             } else {
-                Text("Tidak ada musik yang diputar")
+                Text(L("Tidak ada musik yang diputar", "Nothing playing"))
                     .font(.system(size: 13, weight: .semibold))
-                Text("Putar lagu di Spotify atau Apple Music")
+                Text(L("Putar lagu di Spotify atau Apple Music", "Play a song in Spotify or Apple Music"))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
             }

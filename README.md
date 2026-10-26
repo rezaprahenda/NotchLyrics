@@ -19,7 +19,8 @@
 - **Synced lyrics** under the notch, with a full lyrics view on hover
 - **Playback controls**: play/pause, skip, seek, volume, shuffle and repeat
 - **Romanization** for Japanese, Korean, Chinese and other non-Latin lyrics
-- **Translation** of lyrics, on-device (macOS 15+)
+- **Translation** of lyrics into 8 languages, on-device (macOS 15+)
+- **English and Indonesian** interface
 - **Lyrics picker** to choose a different version when a match is wrong
 - **Stays out of the way**: click-through lyrics that fade as your cursor approaches
 - **Extras**: track-change banner, sleep timer, launch at login, offline cache

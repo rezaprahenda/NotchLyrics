@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var sleepChoices: [NSMenuItem] = []
     private var chosenSleepMinutes = 0
     private var autoPauseItem: NSMenuItem?
+    private var targetChoices: [NSMenuItem] = []
+    private var languageChoices: [NSMenuItem] = []
 
     static func main() {
         let app = NSApplication.shared
@@ -51,14 +53,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false // supaya isEnabled manual di bawah dihormati
 
-        let toggle = NSMenuItem(title: "Tampilkan lirik di mode ringkas",
+        let toggle = NSMenuItem(title: L("Tampilkan lirik di mode ringkas", "Show lyrics in compact mode"),
                                 action: #selector(toggleCompactLyrics),
                                 keyEquivalent: "")
         toggle.target = self
         menu.addItem(toggle)
 
         // Isi baris lirik ringkas: asli / latin / terjemahan / latin + terjemahan
-        let styleItem = NSMenuItem(title: "Isi baris lirik", action: nil, keyEquivalent: "")
+        let styleItem = NSMenuItem(title: L("Isi baris lirik", "Lyric line content"), action: nil, keyEquivalent: "")
         styleItem.indentationLevel = 1
         let styleMenu = NSMenu()
         styleMenu.autoenablesItems = false
@@ -73,18 +75,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(styleItem)
         compactStyleItem = styleItem
 
-        let clickThrough = NSMenuItem(title: "Lirik tembus klik & memudar saat didekati",
+        let clickThrough = NSMenuItem(title: L("Lirik tembus klik & memudar saat didekati", "Click-through lyrics that fade on approach"),
                                       action: #selector(toggleClickThrough),
                                       keyEquivalent: "")
         clickThrough.target = self
         clickThrough.indentationLevel = 1
         menu.addItem(clickThrough)
 
-        let hideAfterClick = NSMenuItem(title: "Sembunyikan lirik setelah diklik", action: nil, keyEquivalent: "")
+        let hideAfterClick = NSMenuItem(title: L("Sembunyikan lirik setelah diklik", "Hide lyrics after clicking"), action: nil, keyEquivalent: "")
         hideAfterClick.indentationLevel = 1
         let sub = NSMenu()
         sub.autoenablesItems = false
-        for (title, seconds) in [("Mati", 0.0), ("3 detik", 3.0), ("5 detik", 5.0), ("10 detik", 10.0)] {
+        for (title, seconds) in [(L("Mati", "Off"), 0.0), (L("3 detik", "3 seconds"), 3.0), (L("5 detik", "5 seconds"), 5.0), (L("10 detik", "10 seconds"), 10.0)] {
             let choice = NSMenuItem(title: title, action: #selector(setHideAfterClick(_:)), keyEquivalent: "")
             choice.target = self
             choice.representedObject = seconds
@@ -94,21 +96,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         hideAfterClick.submenu = sub
         menu.addItem(hideAfterClick)
 
-        let fullWindow = NSMenuItem(title: "Sembunyikan lirik saat jendela memenuhi layar",
+        let fullWindow = NSMenuItem(title: L("Sembunyikan lirik saat jendela memenuhi layar", "Hide lyrics when a window fills the screen"),
                                     action: #selector(toggleFullWindow),
                                     keyEquivalent: "")
         fullWindow.target = self
         fullWindow.indentationLevel = 1
         menu.addItem(fullWindow)
 
-        let peek = NSMenuItem(title: "Notifikasi ganti lagu",
+        let peek = NSMenuItem(title: L("Notifikasi ganti lagu", "Track change banner"),
                               action: #selector(togglePeek),
                               keyEquivalent: "")
         peek.target = self
         menu.addItem(peek)
         peekItem = peek
 
-        let autoPause = NSMenuItem(title: "Pause otomatis app musik lain",
+        let autoPause = NSMenuItem(title: L("Pause otomatis app musik lain", "Auto-pause other music apps"),
                                    action: #selector(toggleAutoPause),
                                    keyEquivalent: "")
         autoPause.target = self
@@ -122,8 +124,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let sleepMenu = NSMenu()
         sleepMenu.autoenablesItems = false
         // representedObject: 0 = mati, -1 = akhir lagu, >0 = menit
-        for (title, minutes) in [("Mati", 0), ("15 menit", 15), ("30 menit", 30), ("45 menit", 45),
-                                 ("1 jam", 60), ("Sampai lagu ini selesai", -1)] {
+        for (title, minutes) in [(L("Mati", "Off"), 0), (L("15 menit", "15 minutes"), 15), (L("30 menit", "30 minutes"), 30),
+                                 (L("45 menit", "45 minutes"), 45), (L("1 jam", "1 hour"), 60),
+                                 (L("Sampai lagu ini selesai", "Until this song ends"), -1)] {
             let choice = NSMenuItem(title: title, action: #selector(setSleep(_:)), keyEquivalent: "")
             choice.target = self
             choice.representedObject = minutes
@@ -136,7 +139,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let login = NSMenuItem(title: "Buka saat login",
+        // Bahasa target terjemahan
+        let target = NSMenuItem(title: L("Terjemahkan ke", "Translate to"), action: nil, keyEquivalent: "")
+        let targetMenu = NSMenu()
+        targetMenu.autoenablesItems = false
+        for code in LyricsStore.translationTargets {
+            let choice = NSMenuItem(title: languageName(code), action: #selector(setTranslationTarget(_:)), keyEquivalent: "")
+            choice.target = self
+            choice.representedObject = code
+            targetMenu.addItem(choice)
+            targetChoices.append(choice)
+        }
+        target.submenu = targetMenu
+        menu.addItem(target)
+
+        // Bahasa tampilan app
+        let language = NSMenuItem(title: L("Bahasa", "Language"), action: nil, keyEquivalent: "")
+        let languageMenu = NSMenu()
+        languageMenu.autoenablesItems = false
+        for lang in AppLanguage.allCases {
+            let choice = NSMenuItem(title: lang.title, action: #selector(setAppLanguage(_:)), keyEquivalent: "")
+            choice.target = self
+            choice.representedObject = lang.rawValue
+            languageMenu.addItem(choice)
+            languageChoices.append(choice)
+        }
+        language.submenu = languageMenu
+        menu.addItem(language)
+
+        let clearCache = NSMenuItem(title: L("Hapus cache lirik…", "Clear lyrics cache…"),
+                                    action: #selector(clearLyricsCache), keyEquivalent: "")
+        clearCache.target = self
+        menu.addItem(clearCache)
+
+        menu.addItem(.separator())
+
+        let login = NSMenuItem(title: L("Buka saat login", "Open at login"),
                                action: #selector(toggleLaunchAtLogin),
                                keyEquivalent: "")
         login.target = self
@@ -144,7 +182,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "Keluar NotchLyrics",
+        let quitItem = NSMenuItem(title: L("Keluar NotchLyrics", "Quit NotchLyrics"),
                                   action: #selector(quitApp),
                                   keyEquivalent: "q")
         quitItem.target = self
@@ -188,17 +226,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let activeSleep: Int
         if player.sleepAtTrackEnd {
             activeSleep = -1
-            sleepItem?.title = "Sleep timer · sampai lagu selesai"
+            sleepItem?.title = L("Sleep timer · sampai lagu selesai", "Sleep timer · until song ends")
         } else if let until = player.sleepUntil {
             let minutes = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
             activeSleep = chosenSleepMinutes
-            sleepItem?.title = "Sleep timer · sisa \(minutes) menit"
+            sleepItem?.title = L("Sleep timer · sisa \(minutes) menit", "Sleep timer · \(minutes) min left")
         } else {
             activeSleep = 0
             sleepItem?.title = "Sleep timer"
         }
         for choice in sleepChoices {
             choice.state = (choice.representedObject as? Int) == activeSleep ? .on : .off
+        }
+
+        for choice in targetChoices {
+            choice.state = (choice.representedObject as? String) == lyrics.translationTarget ? .on : .off
+        }
+        for choice in languageChoices {
+            choice.state = (choice.representedObject as? String) == AppLanguage.current.rawValue ? .on : .off
         }
 
         let seconds = vm?.hideAfterClickSeconds ?? 5
@@ -208,13 +253,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch SMAppService.mainApp.status {
         case .enabled:
             loginItem?.state = .on
-            loginItem?.title = "Buka saat login"
+            loginItem?.title = L("Buka saat login", "Open at login")
         case .requiresApproval:
             loginItem?.state = .mixed
-            loginItem?.title = "Buka saat login (perlu disetujui)"
+            loginItem?.title = L("Buka saat login (perlu disetujui)", "Open at login (needs approval)")
         default:
             loginItem?.state = .off
-            loginItem?.title = "Buka saat login"
+            loginItem?.title = L("Buka saat login", "Open at login")
         }
     }
 
@@ -254,6 +299,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshMenuState()
     }
 
+    @objc private func setTranslationTarget(_ sender: NSMenuItem) {
+        guard let code = sender.representedObject as? String else { return }
+        lyrics.translationTarget = code
+        refreshMenuState()
+    }
+
+    @objc private func setAppLanguage(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let lang = AppLanguage(rawValue: raw),
+              lang != AppLanguage.current else { return }
+        UserDefaults.standard.set(lang.rawValue, forKey: AppLanguage.defaultsKey)
+        relaunch()
+    }
+
+    @objc private func clearLyricsCache() {
+        let alert = NSAlert()
+        alert.messageText = L("Hapus cache lirik?", "Clear lyrics cache?")
+        alert.informativeText = L("Semua lirik & terjemahan yang tersimpan akan diunduh ulang. Pilihan lirik manual tetap disimpan.",
+                                  "All saved lyrics and translations will be downloaded again. Manually chosen lyrics are kept.")
+        alert.addButton(withTitle: L("Hapus", "Clear"))
+        alert.addButton(withTitle: L("Batal", "Cancel"))
+        NSApp.activate()
+        if alert.runModal() == .alertFirstButtonReturn {
+            lyrics.clearCache()
+        }
+    }
+
+    /// Buka ulang app supaya bahasa baru dipakai di seluruh tampilan.
+    private func relaunch() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "sleep 0.7; /usr/bin/open \"$0\"", Bundle.main.bundlePath]
+        try? process.run()
+        NSApp.terminate(nil)
+    }
+
     @objc private func toggleAutoPause() {
         player.autoPauseOthers.toggle()
         refreshMenuState()
@@ -280,8 +361,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 try service.register()
             }
         } catch {
-            showAlert(title: "Gagal mengubah pengaturan login",
-                      message: "\(error.localizedDescription)\n\nPastikan NotchLyrics sudah ada di folder Applications.")
+            showAlert(title: L("Gagal mengubah pengaturan login", "Couldn't change the login setting"),
+                      message: "\(error.localizedDescription)\n\n" + L("Pastikan NotchLyrics sudah ada di folder Applications.", "Make sure NotchLyrics is in the Applications folder."))
         }
         // macOS kadang minta persetujuan manual di Login Items.
         if service.status == .requiresApproval {

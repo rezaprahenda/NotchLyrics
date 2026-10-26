@@ -2,6 +2,10 @@ import AppKit
 import SwiftUI
 import Combine
 
+enum EarSide: Equatable {
+    case left, right
+}
+
 enum NotchMode: Equatable {
     case hidden    // Mac tanpa notch & tidak ada musik
     case idle      // ukuran notch asli (tak terlihat)
@@ -41,9 +45,9 @@ final class NotchViewModel: ObservableObject {
     @Published var frontWindowFillsScreen = false
     @Published var lyricLineFaded = false
     @Published var lyricLineSuppressed = false
-    /// Kursor ada di menu bar dekat telinga notch → telinga disusutkan supaya menu app
-    /// (mis. "Server" di Tableau) yang tertutup bisa terlihat dan diklik.
-    @Published var earsHidden = false
+    /// Telinga (kiri: cover, kanan: equalizer) yang sedang disembunyikan karena kursor ada di
+    /// menu bar di atasnya, supaya menu app (mis. "Server" di Tableau) terlihat dan bisa diklik.
+    @Published var hiddenEar: EarSide?
 
     private static func storedBool(_ key: String, _ defaultValue: Bool) -> Bool {
         (UserDefaults.standard.object(forKey: key) as? Bool) ?? defaultValue
@@ -79,7 +83,7 @@ final class NotchViewModel: ObservableObject {
         case .idle:
             return notchSize
         case .compact:
-            return CGSize(width: baseWidth + (earsHidden ? 0 : earWidth * 2),
+            return CGSize(width: baseWidth + earWidth * 2,
                           height: notchSize.height
                             + (showsLyricLine ? (doubleLine ? compactDoubleLyricHeight : compactLyricHeight) : 0))
         case .peek:
@@ -276,30 +280,38 @@ final class NotchController {
             withAnimation(.easeOut(duration: 0.2)) { vm.lyricLineFaded = faded }
         }
 
-        let inside = mode != .hidden && activeRect.insetBy(dx: -4, dy: -4).contains(mouse)
+        var inside = mode != .hidden && activeRect.insetBy(dx: -4, dy: -4).contains(mouse)
+        if let ear = vm.hiddenEar, earRect(ear).contains(mouse) { inside = false }
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }
         schedule(expand: inside)
     }
 
-    /// Susutkan telinga (cover + equalizer) saat kursor berada di menu bar di sebelah notch.
-    /// Zonanya dihitung dari lebar telinga penuh, jadi tidak kedip-kedip saat telinga menyusut.
-    private func updateEars(_ mouse: NSPoint) {
-        let compact = vm.mode(hasTrack: player.track != nil) == .compact
-        var hide = false
-        if compact {
-            let f = panel.frame
-            let barHeight = vm.notchSize.height
-            let fullWidth = vm.baseWidth + vm.earWidth * 2
-            let earZone = NSRect(x: f.midX - fullWidth / 2 - 8, y: f.maxY - barHeight,
-                                 width: fullWidth + 16, height: barHeight + 1)
-            let notch = NSRect(x: f.midX - vm.baseWidth / 2, y: f.maxY - barHeight,
-                               width: vm.baseWidth, height: barHeight + 1)
-            hide = earZone.contains(mouse) && !notch.contains(mouse)
+    /// Area telinga di menu bar (koordinat layar). Dihitung dari ukuran mode ringkas,
+    /// jadi tetap sama walau telinganya sedang disembunyikan (tidak kedip-kedip).
+    private func earRect(_ side: EarSide) -> NSRect {
+        let f = panel.frame
+        let bar = vm.notchSize.height
+        let fullWidth = vm.baseWidth + vm.earWidth * 2
+        let left = f.midX - fullWidth / 2
+        switch side {
+        case .left:
+            return NSRect(x: left - 8, y: f.maxY - bar, width: vm.earWidth + 8, height: bar + 1)
+        case .right:
+            return NSRect(x: f.midX + vm.baseWidth / 2, y: f.maxY - bar, width: vm.earWidth + 8, height: bar + 1)
         }
-        if vm.earsHidden != hide {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { vm.earsHidden = hide }
+    }
+
+    /// Sembunyikan hanya telinga yang kursornya ada di atasnya.
+    private func updateEars(_ mouse: NSPoint) {
+        var side: EarSide?
+        if vm.mode(hasTrack: player.track != nil) == .compact {
+            if earRect(.left).contains(mouse) { side = .left }
+            else if earRect(.right).contains(mouse) { side = .right }
+        }
+        if vm.hiddenEar != side {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { vm.hiddenEar = side }
         }
     }
 

@@ -41,9 +41,28 @@ final class DiskCache {
             store.lyrics[key] = state
         default:
             store.lyrics[key] = nil
-            store.translations[key] = nil
+            dropTranslations(forTrack: key)
         }
         touch(key)
+    }
+
+    /// Hapus terjemahan lagu ini untuk semua bahasa target (kunci "lagu#bahasa").
+    func removeTranslations(forTrack key: String) {
+        dropTranslations(forTrack: key)
+        touch(key)
+    }
+
+    /// Kosongkan seluruh cache lirik & terjemahan.
+    func clearAll() {
+        store = Store()
+        scheduleSave()
+    }
+
+    private func dropTranslations(forTrack key: String) {
+        for k in Array(store.translations.keys) where k == key || k.hasPrefix(key + "#") {
+            store.translations[k] = nil
+            store.touched[k] = nil
+        }
     }
 
     func setTranslation(_ map: [Int: String]?, for key: String) {

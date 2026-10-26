@@ -8,6 +8,7 @@ import Translation
 struct TranslationRunner: View {
     @ObservedObject var lyrics: LyricsStore
     @State private var configuration: TranslationSession.Configuration?
+    @State private var configuredTarget: String?
 
     var body: some View {
         Color.clear
@@ -20,11 +21,13 @@ struct TranslationRunner: View {
                       !lyrics.translatableLines.isEmpty,
                       lyrics.translations.isEmpty
                 else { return }
-                if configuration == nil {
-                    // Bahasa sumber dideteksi otomatis, target bahasa Indonesia.
+                let target = lyrics.translationTarget
+                if configuration == nil || configuredTarget != target {
+                    // Bahasa sumber dideteksi otomatis; target sesuai pilihan di menu.
+                    configuredTarget = target
                     configuration = TranslationSession.Configuration(
                         source: nil,
-                        target: Locale.Language(identifier: "id")
+                        target: Locale.Language(identifier: target)
                     )
                 } else {
                     configuration?.invalidate() // jalankan ulang untuk lagu baru
@@ -36,7 +39,7 @@ struct TranslationRunner: View {
 @available(macOS 15.0, *)
 extension LyricsStore {
     func translate(using session: TranslationSession) async {
-        let snapshot = await MainActor.run { (self.currentKey, self.translatableLines, self.wantsTranslation) }
+        let snapshot = await MainActor.run { (self.translationKey, self.translatableLines, self.wantsTranslation) }
         guard let key = snapshot.0, snapshot.2, !snapshot.1.isEmpty else { return }
 
         await MainActor.run { self.setTranslationStatus(.translating) }
@@ -60,7 +63,7 @@ extension LyricsStore {
         } catch {
             let message = error.localizedDescription
             await MainActor.run {
-                guard self.currentKey == key else { return }
+                guard self.translationKey == key else { return }
                 self.setTranslationStatus(.failed(message))
             }
         }
@@ -85,7 +88,7 @@ struct TranslateToggle: View {
                     Image(systemName: "translate")
                         .font(.system(size: 10, weight: .semibold))
                 }
-                Text("ID")
+                Text(String(lyrics.translationTarget.prefix(2)).uppercased())
                     .font(.system(size: 10, weight: .bold))
             }
             .foregroundStyle(.white.opacity(lyrics.translationEnabled ? 1 : 0.55))
@@ -95,7 +98,8 @@ struct TranslateToggle: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("Terjemahkan lirik ke bahasa Indonesia")
+        .help(L("Terjemahkan lirik ke \(languageName(lyrics.translationTarget))",
+                "Translate lyrics to \(languageName(lyrics.translationTarget))"))
     }
 }
 
@@ -117,7 +121,9 @@ struct TranslationErrorNote: View {
     }
 
     private func note(for message: String) -> String {
-        if message.contains("Indonesia") { return message }
-        return "Terjemahan gagal. Unduh bahasa Indonesia di System Settings › General › Language & Region › Translation Languages."
+        if message == lyrics.alreadyTranslatedMessage { return message }
+        let name = languageName(lyrics.translationTarget)
+        return L("Terjemahan gagal. Unduh bahasa \(name) di System Settings › General › Language & Region › Translation Languages.",
+                 "Translation failed. Download \(name) in System Settings › General › Language & Region › Translation Languages.")
     }
 }

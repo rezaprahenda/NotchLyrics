@@ -163,6 +163,8 @@ final class PlayerMonitor: ObservableObject {
     func seek(to seconds: Double) {
         guard track != nil else { return }
         let target = max(0, seconds)
+        // Posisi tidak @Published; beri tahu view supaya baris lirik ikut pindah walau sedang pause.
+        objectWillChange.send()
         basePosition = target
         baseDate = Date()
         // String(format:) selalu pakai titik desimal, sesuai sintaks AppleScript.
