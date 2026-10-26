@@ -77,7 +77,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 
 | Gerakan | Hasil |
 |---|---|
-| Hover notch | Panel penuh (halaman terakhir dibuka) |
+| Hover notch | Panel penuh (halaman terakhir dibuka). Tab ikon di tengah, sejajar notch; label hanya di tab aktif |
 | Hover telinga di menu bar | Sisi itu disembunyikan otomatis (jeda 0,15 detik) supaya menu app di bawahnya bisa diklik |
 | Kursor mendekati baris lirik | Baris memudar & tembus klik (sudah ada) |
 | Klik baris lirik (panel penuh) | Seek ke baris itu (sudah ada) |
@@ -101,6 +101,9 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 | Waktu salat & adzan | ikon · hitung mundur | — | adzan | jadwal hari ini | Lokasi (atau kota manual) | 2.0 |
 | Rak file | jumlah file | — | — | daftar file, AirDrop | — | 2.0 |
 | Baterai & AirPods | — | — | ⚡ %, AirPods % | — | Bluetooth (AirPods) | 2.0 |
+| Pengingat minum / berdiri | — | — | "Waktunya minum" | bagian dari halaman Fokus | — | 2.0 |
+| Catatan cepat | — | — | — | satu catatan tempel | — | 2.x |
+| Kamera cermin | — | — | — | pratinjau kamera depan | Kamera (saat dibuka saja) | 2.x |
 | Last.fm | — | — | — | status scrobble | Login Last.fm | 2.x |
 | Salin/bagikan lirik | — | — | — | klik kanan baris | — | 2.x |
 
@@ -113,11 +116,11 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 | **Mode Ramadan**: imsak, hitung mundur buka puasa | ⭐⭐⭐ | Memakai ulang perhitungan jadwal salat |
 | **Rapat berikutnya** dari Kalender + tombol join (Zoom/Meet) | ⭐ | Butuh izin Kalender. Belum dipakai pemilik; tunda |
 | **Tanggal Hijriah** di panel salat | ⭐⭐ | Kalender `islamicUmmAlQura` bawaan Foundation |
-| **Catatan cepat** (1 catatan tempel di panel) | ⭐⭐ | Simpel, berguna |
+| **Catatan cepat** (1 catatan tempel di panel) | ⭐⭐ | Disetujui → peta modul |
 | **Riwayat clipboard** (10 item) | ⭐⭐ | Hati-hati dengan password: lewati item dari password manager |
 | **Jam dunia / zona waktu kedua** | ⭐ | Untuk kerja lintas negara |
-| **Pengingat minum / berdiri** | ⭐ | Bisa digabung ke pomodoro |
-| Kamera cermin (cek penampilan sebelum meeting) | ⭐ | Butuh izin kamera |
+| **Pengingat minum / berdiri** | ⭐⭐ | Disetujui → bagian dari Fokus |
+| Kamera cermin (cek penampilan sebelum meeting) | ⭐⭐ | Disetujui → peta modul. Kamera hanya menyala selama halamannya terbuka |
 | Ganti HUD volume/brightness bawaan | ✖ | Butuh API privat, rawan rusak tiap update macOS |
 | Now playing dari browser (YouTube) | ✖ | API MediaRemote ditutup sejak macOS 15.4 |
 | Cuaca | ✖ | Butuh API key/servis luar. Kurang cocok dengan prinsip privasi |
@@ -139,4 +142,4 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 1. **1.2** (selesai, menunggu build & tes): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
 2. **1.3**: karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
 3. **2.0, nama baru**: arsitektur modul, jendela Pengaturan, Pomodoro, Salat & adzan (+mode Ramadan), Rak file, Baterai & AirPods.
-4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, clipboard. Kalender nanti saja, kalau dibutuhkan.
+4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, kamera cermin, clipboard. Kalender nanti saja, kalau dibutuhkan.
