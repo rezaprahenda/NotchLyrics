@@ -11,5 +11,5 @@ xcrun swiftc \
   -swift-version 5 \
   -target "$ARCH-apple-macos14.0" \
   -o build/tests \
-  Sources/LRC.swift Sources/NotchPriority.swift Tests/*.swift
+  Sources/LRC.swift Sources/NotchPriority.swift Sources/PomodoroCore.swift Tests/*.swift
 ./build/tests

@@ -1,35 +1,120 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Peek (ganti lagu)
+// MARK: - Peek (kejadian singkat)
 
 struct PeekView: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
+    @ObservedObject var pomodoro: PomodoroModule
 
     var body: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: vm.notchSize.height)
-            if let track = player.track {
-                HStack(spacing: 10) {
-                    ArtworkView(image: player.artwork, size: 34, corner: 7)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(track.title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        Text(track.artist)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .lineLimit(1)
+            if let peek = vm.activePeek {
+                Group {
+                    if peek.kind == .trackChange {
+                        trackRow
+                    } else {
+                        eventRow(peek)
                     }
-                    Spacer(minLength: 8)
-                    EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
-                        .frame(width: 20, height: 14)
                 }
                 .padding(.horizontal, 16)
                 .frame(height: vm.peekHeight - 4)
             }
         }
+    }
+
+    @ViewBuilder private var trackRow: some View {
+        HStack(spacing: 10) {
+            ArtworkView(image: player.artwork, size: 34, corner: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(player.track?.title ?? vm.activePeek?.title ?? "")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(player.track?.artist ?? vm.activePeek?.subtitle ?? "")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
+                .frame(width: 20, height: 14)
+        }
+    }
+
+    private func eventRow(_ peek: PeekEvent) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol(for: peek))
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(tint(for: peek))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(peek.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if !peek.subtitle.isEmpty {
+                    Text(peek.subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 6)
+            if peek.kind == .pomodoro, pomodoro.waitingFor != nil {
+                PeekButton(title: L("Mulai", "Start"), filled: true, tint: tint(for: peek)) {
+                    pomodoro.acceptNext()
+                    vm.dismissPeek?()
+                }
+                PeekButton(title: L("Lewati", "Skip"), filled: false, tint: tint(for: peek)) {
+                    pomodoro.skipNext()
+                    vm.dismissPeek?()
+                }
+            }
+        }
+    }
+
+    private func symbol(for peek: PeekEvent) -> String {
+        switch peek.kind {
+        case .pomodoro: return "timer"
+        case .reminder: return "bell"
+        case .device: return "battery.75percent"
+        case .prayer: return "moon.stars"
+        case .trackChange: return "music.note"
+        }
+    }
+
+    private func tint(for peek: PeekEvent) -> Color {
+        switch peek.kind {
+        case .pomodoro: return pomodoro.waitingFor?.isBreak == true ? .prayerAccent : .focusAccent
+        case .reminder: return .reminderAccent
+        case .device: return .deviceAccent
+        case .prayer: return .prayerAccent
+        case .trackChange: return vm.accent(for: player)
+        }
+    }
+}
+
+/// Tombol kapsul kecil di dalam peek.
+struct PeekButton: View {
+    let title: String
+    let filled: Bool
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(filled ? Color.black.opacity(0.85) : .white)
+                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .background(Capsule().fill(filled ? tint : Color.white.opacity(0.14)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

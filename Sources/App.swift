@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import ServiceManagement
 import Carbon.HIToolbox
 import Combine
 
@@ -8,27 +7,20 @@ import Combine
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let player = PlayerMonitor()
     private let lyrics = LyricsStore()
+    private let pomodoro = PomodoroModule()
     private var controller: NotchController?
     private var statusItem: NSStatusItem?
+    private let settingsWindow = SettingsWindowController()
+    private var cancellables = Set<AnyCancellable>()
+
+    // Menu ringkas
+    private var focusItem: NSMenuItem?
+    private var focusStopItem: NSMenuItem?
     private var compactLyricsItem: NSMenuItem?
-    private var clickThroughItem: NSMenuItem?
-    private var fullWindowItem: NSMenuItem?
-    private var hideAfterClickItem: NSMenuItem?
-    private var hideAfterClickChoices: [NSMenuItem] = []
-    private var loginItem: NSMenuItem?
-    private var peekItem: NSMenuItem?
-    private var compactStyleItem: NSMenuItem?
-    private var compactStyleChoices: [NSMenuItem] = []
+    private var karaokeItem: NSMenuItem?
     private var sleepItem: NSMenuItem?
     private var sleepChoices: [NSMenuItem] = []
     private var chosenSleepMinutes = 0
-    private var autoPauseItem: NSMenuItem?
-    private var targetChoices: [NSMenuItem] = []
-    private var karaokeItem: NSMenuItem?
-    private var accentItem: NSMenuItem?
-    private var captureItem: NSMenuItem?
-    private var shortcutsItem: NSMenuItem?
-    private var languageChoices: [NSMenuItem] = []
 
     static func main() {
         let app = NSApplication.shared
@@ -43,12 +35,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         lyrics.bind(to: player)
-        let c = NotchController(player: player, lyrics: lyrics)
+        let c = NotchController(player: player, lyrics: lyrics, pomodoro: pomodoro)
         controller = c
         c.show()
         player.start()
         setupStatusItem()
-        applyShortcuts()
+        // Shortcut ikut menyala / mati dari Pengaturan.
+        c.vm.$shortcutsEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.applyShortcuts() }
+            .store(in: &cancellables)
         startFaces()
     }
 
@@ -66,21 +62,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self else { return }
             self.greeting = false
             self.refreshFace(playing: self.player.isPlaying, peeking: vm.isPeeking,
-                             sleepTimer: self.player.sleepUntil != nil || self.player.sleepAtTrackEnd)
+                             sleepTimer: self.player.sleepUntil != nil || self.player.sleepAtTrackEnd,
+                             focusing: self.pomodoro.isFocusRunning)
         }
-        faceCancellable = Publishers.CombineLatest4(player.$isPlaying, vm.$isPeeking,
-                                                    player.$sleepUntil, player.$sleepAtTrackEnd)
+        let music = Publishers.CombineLatest4(player.$isPlaying, vm.$isPeeking,
+                                              player.$sleepUntil, player.$sleepAtTrackEnd)
+        let focus = pomodoro.$phase.combineLatest(pomodoro.$pausedRemaining)
+        faceCancellable = music.combineLatest(focus)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] playing, peeking, until, atEnd in
-                self?.refreshFace(playing: playing, peeking: peeking, sleepTimer: until != nil || atEnd)
+            .sink { [weak self] musicState, focusState in
+                let (playing, peeking, until, atEnd) = musicState
+                let (phase, paused) = focusState
+                self?.refreshFace(playing: playing, peeking: peeking, sleepTimer: until != nil || atEnd,
+                                  focusing: phase == .focus && paused == nil)
             }
     }
 
-    private func refreshFace(playing: Bool, peeking: Bool, sleepTimer: Bool) {
+    private func refreshFace(playing: Bool, peeking: Bool, sleepTimer: Bool, focusing: Bool) {
         guard !greeting else { return }
         let face: MenuFace
         if peeking {
             face = .lookUp
+        } else if focusing {
+            face = .focus
         } else if sleepTimer || !playing {
             face = .sleep
         } else {
@@ -97,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - Shortcut keyboard
 
-    /// ⌃⌥L lirik ringkas on/off · ⌃⌥[ lirik lebih lambat · ⌃⌥] lirik lebih cepat.
+    /// ⌃⌥L lirik ringkas on/off · ⌃⌥[ / ⌃⌥] geser waktu lirik · ⌃⌥P pomodoro mulai/jeda.
     private func applyShortcuts() {
         HotKeyCenter.shared.unregisterAll()
         guard controller?.vm.shortcutsEnabled ?? true else { return }
@@ -111,109 +115,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         HotKeyCenter.shared.register(keyCode: kVK_ANSI_RightBracket, modifiers: mods) { [weak self] in
             self?.lyrics.adjustOffset(by: 0.5)
         }
+        HotKeyCenter.shared.register(keyCode: kVK_ANSI_P, modifiers: mods) { [weak self] in
+            self?.toggleFocus()
+        }
     }
 
-    // Ikon kecil di menu bar: pengaturan + tombol keluar
+    // MARK: - Menu bar
+
+    /// Menu bar hanya berisi aksi cepat; semua opsi ada di jendela Pengaturan.
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = MenuFace.wink.image
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.autoenablesItems = false // supaya isEnabled manual di bawah dihormati
+        menu.autoenablesItems = false
 
-        let toggle = NSMenuItem(title: L("Tampilkan lirik di mode ringkas", "Show lyrics in compact mode"),
-                                action: #selector(toggleCompactLyrics),
-                                keyEquivalent: "")
-        toggle.target = self
-        menu.addItem(toggle)
+        let focus = NSMenuItem(title: "", action: #selector(toggleFocus), keyEquivalent: "")
+        focus.target = self
+        menu.addItem(focus)
+        focusItem = focus
 
-        // Isi baris lirik ringkas: asli / latin / terjemahan / latin + terjemahan
-        let styleItem = NSMenuItem(title: L("Isi baris lirik", "Lyric line content"), action: nil, keyEquivalent: "")
-        styleItem.indentationLevel = 1
-        let styleMenu = NSMenu()
-        styleMenu.autoenablesItems = false
-        for style in CompactLyricStyle.allCases {
-            let choice = NSMenuItem(title: style.title, action: #selector(setCompactStyle(_:)), keyEquivalent: "")
-            choice.target = self
-            choice.representedObject = style.rawValue
-            styleMenu.addItem(choice)
-            compactStyleChoices.append(choice)
-        }
-        styleItem.submenu = styleMenu
-        menu.addItem(styleItem)
-        compactStyleItem = styleItem
-
-        let karaoke = NSMenuItem(title: L("Karaoke (baris terisi mengikuti lagu)", "Karaoke (lines fill as they are sung)"),
-                                 action: #selector(toggleKaraoke), keyEquivalent: "")
-        karaoke.target = self
-        karaoke.indentationLevel = 1
-        menu.addItem(karaoke)
-        karaokeItem = karaoke
-
-        let clickThrough = NSMenuItem(title: L("Lirik tembus klik & memudar saat didekati", "Click-through lyrics that fade on approach"),
-                                      action: #selector(toggleClickThrough),
-                                      keyEquivalent: "")
-        clickThrough.target = self
-        clickThrough.indentationLevel = 1
-        menu.addItem(clickThrough)
-
-        let hideAfterClick = NSMenuItem(title: L("Sembunyikan lirik setelah diklik", "Hide lyrics after clicking"), action: nil, keyEquivalent: "")
-        hideAfterClick.indentationLevel = 1
-        let sub = NSMenu()
-        sub.autoenablesItems = false
-        for (title, seconds) in [(L("Mati", "Off"), 0.0), (L("3 detik", "3 seconds"), 3.0), (L("5 detik", "5 seconds"), 5.0), (L("10 detik", "10 seconds"), 10.0)] {
-            let choice = NSMenuItem(title: title, action: #selector(setHideAfterClick(_:)), keyEquivalent: "")
-            choice.target = self
-            choice.representedObject = seconds
-            sub.addItem(choice)
-            hideAfterClickChoices.append(choice)
-        }
-        hideAfterClick.submenu = sub
-        menu.addItem(hideAfterClick)
-
-        let fullWindow = NSMenuItem(title: L("Sembunyikan lirik saat jendela memenuhi layar", "Hide lyrics when a window fills the screen"),
-                                    action: #selector(toggleFullWindow),
-                                    keyEquivalent: "")
-        fullWindow.target = self
-        fullWindow.indentationLevel = 1
-        menu.addItem(fullWindow)
-
-        let peek = NSMenuItem(title: L("Notifikasi ganti lagu", "Track change banner"),
-                              action: #selector(togglePeek),
-                              keyEquivalent: "")
-        peek.target = self
-        menu.addItem(peek)
-        peekItem = peek
-
-        let accent = NSMenuItem(title: L("Warna mengikuti cover album", "Match colors to album art"),
-                                action: #selector(toggleAccent), keyEquivalent: "")
-        accent.target = self
-        menu.addItem(accent)
-        accentItem = accent
-
-        let capture = NSMenuItem(title: L("Sembunyikan saat share screen & rekam layar", "Hide during screen sharing & recording"),
-                                 action: #selector(toggleCapture), keyEquivalent: "")
-        capture.target = self
-        menu.addItem(capture)
-        captureItem = capture
-
-        let shortcuts = NSMenuItem(title: L("Shortcut keyboard (⌃⌥L, ⌃⌥[ ⌃⌥])", "Keyboard shortcuts (⌃⌥L, ⌃⌥[ ⌃⌥])"),
-                                   action: #selector(toggleShortcuts), keyEquivalent: "")
-        shortcuts.target = self
-        shortcuts.toolTip = L("⌃⌥L: lirik ringkas on/off · ⌃⌥[ / ⌃⌥]: geser waktu lirik",
-                              "⌃⌥L: compact lyrics on/off · ⌃⌥[ / ⌃⌥]: shift lyric timing")
-        menu.addItem(shortcuts)
-        shortcutsItem = shortcuts
-
-        let autoPause = NSMenuItem(title: L("Pause otomatis app musik lain", "Auto-pause other music apps"),
-                                   action: #selector(toggleAutoPause),
-                                   keyEquivalent: "")
-        autoPause.target = self
-        menu.addItem(autoPause)
-        autoPauseItem = autoPause
-
-        menu.addItem(.separator())
+        let stop = NSMenuItem(title: L("Hentikan pomodoro", "Stop pomodoro"), action: #selector(stopFocus), keyEquivalent: "")
+        stop.target = self
+        stop.indentationLevel = 1
+        menu.addItem(stop)
+        focusStopItem = stop
 
         // Sleep timer
         let sleep = NSMenuItem(title: "Sleep timer", action: nil, keyEquivalent: "")
@@ -235,93 +162,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        // Bahasa target terjemahan
-        let target = NSMenuItem(title: L("Terjemahkan ke", "Translate to"), action: nil, keyEquivalent: "")
-        let targetMenu = NSMenu()
-        targetMenu.autoenablesItems = false
-        for code in LyricsStore.translationTargets {
-            let choice = NSMenuItem(title: languageName(code), action: #selector(setTranslationTarget(_:)), keyEquivalent: "")
-            choice.target = self
-            choice.representedObject = code
-            targetMenu.addItem(choice)
-            targetChoices.append(choice)
-        }
-        target.submenu = targetMenu
-        menu.addItem(target)
+        let compact = NSMenuItem(title: L("Tampilkan lirik di mode ringkas", "Show lyrics in compact mode"),
+                                 action: #selector(toggleCompactLyrics), keyEquivalent: "")
+        compact.target = self
+        menu.addItem(compact)
+        compactLyricsItem = compact
 
-        // Bahasa tampilan app
-        let language = NSMenuItem(title: L("Bahasa", "Language"), action: nil, keyEquivalent: "")
-        let languageMenu = NSMenu()
-        languageMenu.autoenablesItems = false
-        for lang in AppLanguage.allCases {
-            let choice = NSMenuItem(title: lang.title, action: #selector(setAppLanguage(_:)), keyEquivalent: "")
-            choice.target = self
-            choice.representedObject = lang.rawValue
-            languageMenu.addItem(choice)
-            languageChoices.append(choice)
-        }
-        language.submenu = languageMenu
-        menu.addItem(language)
-
-        let clearCache = NSMenuItem(title: L("Hapus cache lirik…", "Clear lyrics cache…"),
-                                    action: #selector(clearLyricsCache), keyEquivalent: "")
-        clearCache.target = self
-        menu.addItem(clearCache)
+        let karaoke = NSMenuItem(title: "Karaoke", action: #selector(toggleKaraoke), keyEquivalent: "")
+        karaoke.target = self
+        karaoke.indentationLevel = 1
+        menu.addItem(karaoke)
+        karaokeItem = karaoke
 
         menu.addItem(.separator())
 
-        let login = NSMenuItem(title: L("Buka saat login", "Open at login"),
-                               action: #selector(toggleLaunchAtLogin),
-                               keyEquivalent: "")
-        login.target = self
-        menu.addItem(login)
+        let settings = NSMenuItem(title: L("Pengaturan…", "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: L("Keluar popocu", "Quit popocu"),
-                                  action: #selector(quitApp),
-                                  keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
+        let quit = NSMenuItem(title: L("Keluar popocu", "Quit popocu"), action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
 
         item.menu = menu
         statusItem = item
-        compactLyricsItem = toggle
-        clickThroughItem = clickThrough
-        fullWindowItem = fullWindow
-        hideAfterClickItem = hideAfterClick
-        loginItem = login
         refreshMenuState()
     }
 
-    /// Selalu baca status terbaru tiap menu dibuka (bisa saja diubah dari System Settings).
     func menuWillOpen(_ menu: NSMenu) {
         refreshMenuState()
     }
 
     private func refreshMenuState() {
-        let vm = controller?.vm
-        let compactOn = vm?.showCompactLyrics ?? true
+        // Pomodoro
+        let mins = pomodoro.settings.focusMinutes
+        if pomodoro.isPaused {
+            focusItem?.title = L("Lanjutkan pomodoro", "Resume pomodoro")
+        } else if pomodoro.phase != .idle {
+            focusItem?.title = L("Jeda pomodoro", "Pause pomodoro")
+        } else if let next = pomodoro.waitingFor {
+            focusItem?.title = next.isBreak ? L("Mulai istirahat", "Start break") : L("Mulai fokus lagi", "Focus again")
+        } else {
+            focusItem?.title = L("Mulai fokus (\(mins) menit)", "Start focus (\(mins) min)")
+        }
+        focusItem?.isHidden = !pomodoro.enabled
+        focusStopItem?.isHidden = !pomodoro.enabled || !pomodoro.isActive
+
+        // Lirik
+        let compactOn = controller?.vm.showCompactLyrics ?? true
         compactLyricsItem?.state = compactOn ? .on : .off
-        clickThroughItem?.state = (vm?.lyricsClickThrough ?? true) ? .on : .off
-        fullWindowItem?.state = (vm?.hideLyricsWhenFullWindow ?? true) ? .on : .off
-        // Dua opsi ini hanya relevan kalau baris lirik ringkas aktif.
-        clickThroughItem?.isEnabled = compactOn
-        fullWindowItem?.isEnabled = compactOn
-        // "Sembunyikan setelah diklik" butuh tembus klik, karena kliknya harus sampai ke app di bawah.
-        hideAfterClickItem?.isEnabled = compactOn && (vm?.lyricsClickThrough ?? true)
-        peekItem?.state = (vm?.showTrackPeek ?? true) ? .on : .off
         karaokeItem?.state = lyrics.karaokeEnabled ? .on : .off
         karaokeItem?.isEnabled = compactOn
-        accentItem?.state = (vm?.accentFromArtwork ?? false) ? .on : .off
-        captureItem?.state = (vm?.hideFromScreenCapture ?? false) ? .on : .off
-        shortcutsItem?.state = (vm?.shortcutsEnabled ?? true) ? .on : .off
-        autoPauseItem?.state = player.autoPauseOthers ? .on : .off
-
-        compactStyleItem?.isEnabled = compactOn
-        for choice in compactStyleChoices {
-            choice.state = (choice.representedObject as? String) == lyrics.compactStyle.rawValue ? .on : .off
-        }
 
         // Sleep timer: tandai pilihan aktif + tampilkan sisa waktu di judul.
         let activeSleep: Int
@@ -339,29 +232,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for choice in sleepChoices {
             choice.state = (choice.representedObject as? Int) == activeSleep ? .on : .off
         }
+    }
 
-        for choice in targetChoices {
-            choice.state = (choice.representedObject as? String) == lyrics.translationTarget ? .on : .off
-        }
-        for choice in languageChoices {
-            choice.state = (choice.representedObject as? String) == AppLanguage.current.rawValue ? .on : .off
-        }
+    // MARK: - Aksi
 
-        let seconds = vm?.hideAfterClickSeconds ?? 5
-        for choice in hideAfterClickChoices {
-            choice.state = (choice.representedObject as? Double) == seconds ? .on : .off
-        }
-        switch SMAppService.mainApp.status {
-        case .enabled:
-            loginItem?.state = .on
-            loginItem?.title = L("Buka saat login", "Open at login")
-        case .requiresApproval:
-            loginItem?.state = .mixed
-            loginItem?.title = L("Buka saat login (perlu disetujui)", "Open at login (needs approval)")
-        default:
-            loginItem?.state = .off
-            loginItem?.title = L("Buka saat login", "Open at login")
-        }
+    @objc private func toggleFocus() {
+        guard pomodoro.enabled else { return }
+        pomodoro.togglePause()
+        refreshMenuState()
+    }
+
+    @objc private func stopFocus() {
+        pomodoro.stop()
+        refreshMenuState()
     }
 
     @objc private func toggleCompactLyrics() {
@@ -370,22 +253,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshMenuState()
     }
 
-    @objc private func toggleClickThrough() {
-        guard let vm = controller?.vm else { return }
-        vm.lyricsClickThrough.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func setHideAfterClick(_ sender: NSMenuItem) {
-        guard let vm = controller?.vm, let seconds = sender.representedObject as? Double else { return }
-        vm.hideAfterClickSeconds = seconds
-        refreshMenuState()
-    }
-
-    @objc private func setCompactStyle(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let style = CompactLyricStyle(rawValue: raw) else { return }
-        lyrics.compactStyle = style
+    @objc private func toggleKaraoke() {
+        lyrics.karaokeEnabled.toggle()
         refreshMenuState()
     }
 
@@ -400,105 +269,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         refreshMenuState()
     }
 
-    @objc private func toggleKaraoke() {
-        lyrics.karaokeEnabled.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func toggleAccent() {
-        controller?.vm.accentFromArtwork.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func toggleCapture() {
-        controller?.vm.hideFromScreenCapture.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func toggleShortcuts() {
-        controller?.vm.shortcutsEnabled.toggle()
-        applyShortcuts()
-        refreshMenuState()
-    }
-
-    @objc private func setTranslationTarget(_ sender: NSMenuItem) {
-        guard let code = sender.representedObject as? String else { return }
-        lyrics.translationTarget = code
-        refreshMenuState()
-    }
-
-    @objc private func setAppLanguage(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String,
-              let lang = AppLanguage(rawValue: raw),
-              lang != AppLanguage.current else { return }
-        UserDefaults.standard.set(lang.rawValue, forKey: AppLanguage.defaultsKey)
-        relaunch()
-    }
-
-    @objc private func clearLyricsCache() {
-        let alert = NSAlert()
-        alert.messageText = L("Hapus cache lirik?", "Clear lyrics cache?")
-        alert.informativeText = L("Semua lirik & terjemahan yang tersimpan akan diunduh ulang. Pilihan lirik manual tetap disimpan.",
-                                  "All saved lyrics and translations will be downloaded again. Manually chosen lyrics are kept.")
-        alert.addButton(withTitle: L("Hapus", "Clear"))
-        alert.addButton(withTitle: L("Batal", "Cancel"))
-        NSApp.activate()
-        if alert.runModal() == .alertFirstButtonReturn {
-            lyrics.clearCache()
-        }
-    }
-
-    /// Buka ulang app supaya bahasa baru dipakai di seluruh tampilan.
-    private func relaunch() {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", "sleep 0.7; /usr/bin/open \"$0\"", Bundle.main.bundlePath]
-        try? process.run()
-        NSApp.terminate(nil)
-    }
-
-    @objc private func toggleAutoPause() {
-        player.autoPauseOthers.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func togglePeek() {
+    @objc private func openSettings() {
         guard let vm = controller?.vm else { return }
-        vm.showTrackPeek.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func toggleFullWindow() {
-        guard let vm = controller?.vm else { return }
-        vm.hideLyricsWhenFullWindow.toggle()
-        refreshMenuState()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        let service = SMAppService.mainApp
-        do {
-            if service.status == .enabled {
-                try service.unregister()
-            } else {
-                try service.register()
-            }
-        } catch {
-            showAlert(title: L("Gagal mengubah pengaturan login", "Couldn't change the login setting"),
-                      message: "\(error.localizedDescription)\n\n" + L("Pastikan popocu sudah ada di folder Applications.", "Make sure popocu is in the Applications folder."))
-        }
-        // macOS kadang minta persetujuan manual di Login Items.
-        if service.status == .requiresApproval {
-            SMAppService.openSystemSettingsLoginItems()
-        }
-        refreshMenuState()
-    }
-
-    private func showAlert(title: String, message: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        NSApp.activate()
-        alert.runModal()
+        settingsWindow.show(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
     }
 
     @objc private func quitApp() {

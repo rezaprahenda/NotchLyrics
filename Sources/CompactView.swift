@@ -7,16 +7,15 @@ struct CompactView: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
+    @ObservedObject var pomodoro: PomodoroModule
     let showLine: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                ArtworkView(image: player.artwork, size: 20, corner: 5)
+                leftEar
                 Spacer(minLength: vm.baseWidth)
-                EqualizerView(isPlaying: player.isPlaying,
-                              color: vm.accent(for: player))
-                    .frame(width: 20, height: 14)
+                rightEar
             }
             .padding(.horizontal, 14)
             .frame(height: vm.notchSize.height)
@@ -64,6 +63,66 @@ struct CompactView: View {
                 .clipped()
                 .opacity(vm.lyricLineSuppressed ? 0 : (vm.lyricLineFaded ? 0.15 : 1))
             }
+        }
+        .overlay(alignment: .bottomLeading) {
+            // Progres sesi pomodoro: garis tipis di tepi bawah.
+            if vm.earOwner == .pomodoro, pomodoro.phase != .idle {
+                TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused)) { ctx in
+                    GeometryReader { g in
+                        Rectangle()
+                            .fill(Color.focusAccent)
+                            .frame(width: g.size.width * pomodoro.progress(at: ctx.date), height: 2)
+                            .frame(maxHeight: .infinity, alignment: .bottom)
+                    }
+                }
+                .frame(height: 2)
+            }
+        }
+    }
+
+    // MARK: Telinga
+
+    @ViewBuilder private var leftEar: some View {
+        if vm.earOwner == .pomodoro {
+            TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
+                ZStack {
+                    ProgressRing(progress: pomodoro.phase == .idle ? 1 : pomodoro.progress(at: ctx.date),
+                                 color: pomodoro.phase.isBreak ? .prayerAccent : .focusAccent)
+                    if player.track != nil {
+                        ArtworkView(image: player.artwork, size: 15, corner: 4)
+                    } else {
+                        Image(systemName: "timer")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.focusAccent)
+                    }
+                }
+                .frame(width: 24, height: 24)
+            }
+        } else {
+            ArtworkView(image: player.artwork, size: 20, corner: 5)
+        }
+    }
+
+    @ViewBuilder private var rightEar: some View {
+        if vm.earOwner == .pomodoro {
+            Group {
+                if let next = pomodoro.waitingFor {
+                    Text(next.isBreak ? L("rehat?", "break?") : L("fokus?", "focus?"))
+                } else {
+                    TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                        Text(PomodoroCore.clock(pomodoro.remaining(at: ctx.date)))
+                            .opacity(pomodoro.isPaused ? 0.5 : 1)
+                    }
+                }
+            }
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(pomodoro.phase.isBreak ? Color.prayerAccent : Color.focusAccent)
+            .lineLimit(1)
+            .fixedSize()
+        } else {
+            EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
+                .frame(width: 20, height: 14)
         }
     }
 }

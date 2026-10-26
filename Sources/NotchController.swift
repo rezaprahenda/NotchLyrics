@@ -42,6 +42,17 @@ final class NotchViewModel: ObservableObject {
 
     /// Status runtime (tidak disimpan).
     @Published var isPeeking = false
+    /// Peek yang sedang tampil (nil = tidak ada).
+    @Published var activePeek: PeekEvent?
+    /// Siapa yang memakai telinga notch (aturan ROADMAP §3), diisi oleh NotchController.
+    @Published var earOwner: EarOwner = .none
+    /// Halaman panel penuh yang terakhir dibuka.
+    @Published var expandedPage: ExpandedPage =
+        ExpandedPage(rawValue: UserDefaults.standard.string(forKey: "expandedPage") ?? "") ?? .music {
+        didSet { UserDefaults.standard.set(expandedPage.rawValue, forKey: "expandedPage") }
+    }
+    /// Tutup peek yang sedang tampil (dipasang oleh NotchController, dipakai tombol di peek).
+    var dismissPeek: (() -> Void)?
     @Published var frontWindowFillsScreen = false
     @Published var lyricLineFaded = false
     @Published var lyricLineSuppressed = false
@@ -79,10 +90,10 @@ final class NotchViewModel: ObservableObject {
 
     var baseWidth: CGFloat { hasNotch ? notchSize.width : 180 }
 
-    func mode(hasTrack: Bool) -> NotchMode {
+    func mode() -> NotchMode {
         if isExpanded { return .expanded }
-        if isPeeking && hasTrack { return .peek }
-        if hasTrack { return .compact }
+        if activePeek != nil { return .peek }
+        if earOwner != .none { return .compact }
         return hasNotch ? .idle : .hidden
     }
 
@@ -109,7 +120,7 @@ final class NotchViewModel: ObservableObject {
                           height: notchSize.height + peekHeight)
         case .expanded:
             return CGSize(width: max(baseWidth + 220, 500),
-                          height: notchSize.height + 214)
+                          height: notchSize.height + 244)
         }
     }
 
@@ -140,6 +151,7 @@ final class NotchController {
     private let panel: NotchPanel
     private let player: PlayerMonitor
     private let lyrics: LyricsStore
+    private let pomodoro: PomodoroModule
 
     private var monitors: [Any] = []
     private var hoverTimer: Timer?
@@ -153,10 +165,18 @@ final class NotchController {
     private var lastTrackKey: String?
     private var trackCancellable: AnyCancellable?
     private var captureCancellable: AnyCancellable?
+    private var ownerCancellables = Set<AnyCancellable>()
+    private var peekQueue = PeekQueue()
+    /// Kapan musik di-pause (untuk aturan "pause lama turun prioritas").
+    private var pausedAt: Date?
+    private var ownerRefreshWork: DispatchWorkItem?
+    /// Musik di-pause oleh pomodoro (bukan oleh pengguna) → boleh dilanjutkan otomatis.
+    private var pausedByPomodoro = false
 
-    init(player: PlayerMonitor, lyrics: LyricsStore) {
+    init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule) {
         self.player = player
         self.lyrics = lyrics
+        self.pomodoro = pomodoro
 
         let size = NotchViewModel.windowSize
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -174,7 +194,7 @@ final class NotchController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = true
 
-        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics)
+        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -228,6 +248,8 @@ final class NotchController {
             .removeDuplicates()
             .sink { [weak self] track in self?.trackChanged(track) }
 
+        startCoordinator()
+
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
@@ -265,7 +287,7 @@ final class NotchController {
     /// Area notch saat ini: rect penuh, plus (kalau baris lirik tembus klik aktif)
     /// strip setinggi menu bar dan zona baris lirik di bawahnya.
     private func zones(ignoringSuppression: Bool = false) -> (mode: NotchMode, full: NSRect, strip: NSRect?, lineZone: NSRect?) {
-        let mode = vm.mode(hasTrack: player.track != nil)
+        let mode = vm.mode()
         let showLine = vm.showsLyricLine(lyrics.state, ignoringSuppression: ignoringSuppression)
         let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: lyrics.compactIsDouble)
         let f = panel.frame
@@ -288,10 +310,18 @@ final class NotchController {
 
         var activeRect = z.full
         var faded = false
+        var expandAllowed = true
         if z.mode == .peek {
-            // Notifikasi ganti lagu tembus klik; hanya strip setinggi menu bar yang interaktif.
-            activeRect = NSRect(x: z.full.minX, y: panel.frame.maxY - vm.notchSize.height,
-                                width: z.full.width, height: vm.notchSize.height)
+            // Peek tembus klik; hanya strip setinggi menu bar yang interaktif...
+            let strip = NSRect(x: z.full.minX, y: panel.frame.maxY - vm.notchSize.height,
+                               width: z.full.width, height: vm.notchSize.height)
+            if vm.activePeek?.kind == .pomodoro {
+                // ...kecuali peek pomodoro yang punya tombol: bisa diklik, tapi tidak membuka panel penuh.
+                activeRect = z.full
+                expandAllowed = strip.insetBy(dx: -4, dy: -4).contains(mouse)
+            } else {
+                activeRect = strip
+            }
         } else if let strip = z.strip, let lineZone = z.lineZone {
             // Hanya strip setinggi notch/menu bar yang interaktif; baris lirik di bawahnya tembus klik.
             activeRect = strip
@@ -315,7 +345,7 @@ final class NotchController {
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
         }
-        schedule(expand: inside)
+        schedule(expand: inside && expandAllowed)
     }
 
     /// Area telinga di menu bar (koordinat layar): pemicu menyembunyikan sisi itu.
@@ -348,7 +378,7 @@ final class NotchController {
     /// di kolom sisi itu. Ada jeda kecil supaya tidak kedip saat kursor cuma lewat.
     private func updateEars(_ mouse: NSPoint) {
         var side: EarSide?
-        if vm.mode(hasTrack: player.track != nil) == .compact {
+        if vm.mode() == .compact {
             if let current = vm.hiddenEar, columnRect(current).contains(mouse) {
                 side = current
             } else if earRect(.left).contains(mouse) {
@@ -384,15 +414,136 @@ final class NotchController {
               let track, let previous, previous != track.key,
               !vm.isExpanded
         else { return }
+        post(PeekEvent(kind: .trackChange, id: track.key, createdAt: Date(),
+                       title: track.title, subtitle: track.artist))
+    }
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { vm.isPeeking = true }
+    // MARK: - Koordinator: pemilik telinga & peek
+
+    private func startCoordinator() {
+        vm.dismissPeek = { [weak self] in self?.dismissPeek() }
+        pomodoro.onEvent = { [weak self] event in self?.handlePomodoro(event) }
+
+        player.$isPlaying
+            .removeDuplicates()
+            .sink { [weak self] playing in
+                guard let self else { return }
+                self.pausedAt = playing ? nil : (self.pausedAt ?? Date())
+            }
+            .store(in: &ownerCancellables)
+
+        // Semua masukan aturan prioritas → hitung ulang pemilik telinga.
+        Publishers.Merge4(player.$track.map { _ in () },
+                          player.$isPlaying.map { _ in () },
+                          pomodoro.$phase.map { _ in () },
+                          pomodoro.$waitingFor.map { _ in () })
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.refreshOwner() }
+            .store(in: &ownerCancellables)
+    }
+
+    private func refreshOwner() {
+        var s = NotchSituation()
+        s.hasTrack = player.track != nil
+        s.isPlaying = player.isPlaying
+        s.pausedFor = pausedAt.map { Date().timeIntervalSince($0) } ?? 0
+        s.pomodoroRunning = pomodoro.isActive
+        let owner = NotchPriority.earOwner(s)
+        if vm.earOwner != owner {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { vm.earOwner = owner }
+        }
+        // Musik yang di-pause turun prioritas setelah 1 menit: hitung ulang saat itu.
+        ownerRefreshWork?.cancel()
+        if let pausedAt, s.hasTrack, !s.isPlaying {
+            let wait = NotchPriority.musicIdleAfter - Date().timeIntervalSince(pausedAt) + 0.5
+            if wait > 0 {
+                let work = DispatchWorkItem { [weak self] in self?.refreshOwner() }
+                ownerRefreshWork = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: work)
+            }
+        }
+    }
+
+    /// Masukkan peek ke antrian; tampil kalau tidak ada peek lain.
+    func post(_ event: PeekEvent) {
+        peekQueue.push(event)
+        presentNextPeek()
+    }
+
+    private func presentNextPeek() {
+        guard vm.activePeek == nil, !vm.isExpanded, let event = peekQueue.next() else { return }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            vm.activePeek = event
+            vm.isPeeking = true
+        }
+        schedulePeekEnd(after: event.kind.duration)
+    }
+
+    private func schedulePeekEnd(after seconds: TimeInterval) {
         peekWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { self.vm.isPeeking = false }
+            // Peek dengan tombol tetap terbuka selama kursor di atasnya.
+            if self.vm.activePeek?.kind == .pomodoro, self.zones().full.contains(NSEvent.mouseLocation) {
+                self.schedulePeekEnd(after: 2)
+                return
+            }
+            self.dismissPeek()
         }
         peekWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+    }
+
+    private func dismissPeek() {
+        peekWork?.cancel()
+        peekWork = nil
+        guard vm.activePeek != nil else { return }
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            vm.activePeek = nil
+            vm.isPeeking = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.presentNextPeek() }
+    }
+
+    // MARK: - Pomodoro
+
+    private func handlePomodoro(_ event: PomodoroEvent) {
+        switch event {
+        case .phaseStarted(let phase):
+            applyMusicPolicy(for: phase)
+        case .phaseEnded(let finished, let next):
+            let minutes = Int(PomodoroCore.duration(of: next, settings: pomodoro.settings) / 60)
+            let total = pomodoro.settings.sessionsBeforeLongBreak
+            let title = finished == .focus
+                ? L("Fokus selesai — sesi \(max(pomodoro.cycleFocusDone, 1)) dari \(total)",
+                    "Focus done — session \(max(pomodoro.cycleFocusDone, 1)) of \(total)")
+                : L("Istirahat selesai", "Break's over")
+            let subtitle = next.isBreak
+                ? L("Istirahat \(minutes) menit", "\(minutes)-minute break")
+                : L("Lanjut fokus \(minutes) menit", "Focus for \(minutes) minutes")
+            NSSound(named: "Glass")?.play()
+            post(PeekEvent(kind: .pomodoro, id: "pomodoro", createdAt: Date(), title: title, subtitle: subtitle))
+        case .reminder(let title, let subtitle):
+            post(PeekEvent(kind: .reminder, id: title, createdAt: Date(), title: title, subtitle: subtitle))
+        }
+    }
+
+    private func applyMusicPolicy(for phase: PomodoroPhase) {
+        let shouldPause: Bool
+        switch pomodoro.musicPolicy {
+        case .untouched: return
+        case .pauseOnBreak: shouldPause = phase.isBreak
+        case .pauseOnFocus: shouldPause = phase == .focus
+        }
+        if shouldPause {
+            if player.isPlaying {
+                player.pause()
+                pausedByPomodoro = true
+            }
+        } else if pausedByPomodoro {
+            player.play()
+            pausedByPomodoro = false
+        }
     }
 
     /// Klik di zona baris lirik → sembunyikan liriknya beberapa detik (timer diulang tiap klik).
@@ -470,6 +621,11 @@ final class NotchController {
             }
             self.pending = nil
             self.pendingExpand = nil
+            if expand {
+                self.dismissPeek()
+            } else {
+                self.presentNextPeek()
+            }
         }
         pending = work
         DispatchQueue.main.asyncAfter(deadline: .now() + (expand ? 0.12 : 0.3), execute: work)

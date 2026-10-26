@@ -161,6 +161,24 @@ final class PlayerMonitor: ObservableObject {
         send("playpause")
     }
 
+    func pause() {
+        guard isPlaying else { return }
+        let p = position
+        isPlaying = false
+        basePosition = p
+        baseDate = Date()
+        send("pause")
+    }
+
+    func play() {
+        guard !isPlaying, track != nil else { return }
+        let p = position
+        isPlaying = true
+        basePosition = p
+        baseDate = Date()
+        send("play")
+    }
+
     func next() { send("next track") }
     func previous() { send("previous track") }
 

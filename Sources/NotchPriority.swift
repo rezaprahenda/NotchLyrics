@@ -53,9 +53,10 @@ struct PeekEvent: Equatable {
     /// Urutan = prioritas (makin besar makin penting).
     enum Kind: Int, Comparable {
         case trackChange = 0
-        case device = 1      // charger, baterai, AirPods
-        case pomodoro = 2
-        case prayer = 3
+        case reminder = 1    // minum, berdiri
+        case device = 2      // charger, baterai, AirPods
+        case pomodoro = 3
+        case prayer = 4
 
         static func < (a: Kind, b: Kind) -> Bool { a.rawValue < b.rawValue }
 
@@ -64,6 +65,7 @@ struct PeekEvent: Equatable {
             switch self {
             case .prayer: return 10
             case .pomodoro: return 8
+            case .reminder: return 5
             case .device, .trackChange: return 3
             }
         }
@@ -73,6 +75,8 @@ struct PeekEvent: Equatable {
     /// Penanda isi (mis. key lagu), untuk membuang duplikat.
     let id: String
     let createdAt: Date
+    var title = ""
+    var subtitle = ""
 }
 
 /// Satu peek tampil pada satu waktu; sisanya antre (maks. 3) menurut prioritas.

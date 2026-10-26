@@ -44,9 +44,10 @@ struct NotchRootView: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
+    @ObservedObject var pomodoro: PomodoroModule
 
     var body: some View {
-        let mode = vm.mode(hasTrack: player.track != nil)
+        let mode = vm.mode()
         let showLine = vm.showsLyricLine(lyrics.state)
         let doubleLine = lyrics.compactIsDouble
         let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: doubleLine)
@@ -83,13 +84,13 @@ struct NotchRootView: View {
 
             switch mode {
             case .expanded:
-                ExpandedView(vm: vm, player: player, lyrics: lyrics)
+                ExpandedView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             case .compact:
-                CompactView(vm: vm, player: player, lyrics: lyrics, showLine: showLine)
+                CompactView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, showLine: showLine)
                     .transition(.opacity)
             case .peek:
-                PeekView(vm: vm, player: player)
+                PeekView(vm: vm, player: player, pomodoro: pomodoro)
                     .transition(.opacity)
             case .idle, .hidden:
                 EmptyView()
