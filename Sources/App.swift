@@ -56,6 +56,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak self] _ in self?.applyShortcuts() }
             .store(in: &cancellables)
         startFaces()
+        NotificationCenter.default.publisher(for: .popocuOpenSettings)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.openSettings() }
+            .store(in: &cancellables)
     }
 
     // MARK: - Ekspresi ikon menu bar

@@ -53,8 +53,8 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            GeneralSettings(vm: vm, player: player, lyrics: lyrics, shelf: shelf, device: device,
-                            notes: notes, mirror: mirror, clipboard: clipboard)
+            GeneralSettings(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
+                            shelf: shelf, device: device, notes: notes, mirror: mirror, clipboard: clipboard)
                 .tabItem { Label(L("Umum", "General"), systemImage: "gearshape") }
             MusicSettings(vm: vm, lyrics: lyrics, lastfm: lastfm)
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
@@ -73,6 +73,8 @@ struct GeneralSettings: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
+    @ObservedObject var pomodoro: PomodoroModule
+    @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
     @ObservedObject var device: DeviceModule
     @ObservedObject var notes: NotesModule
@@ -109,6 +111,18 @@ struct GeneralSettings: View {
                 }
             }
 
+            Section(L("Modul (tab di panel penuh)", "Modules (tabs in the full panel)")) {
+                Toggle(L("Pomodoro", "Pomodoro"), isOn: $pomodoro.enabled)
+                Toggle(L("Jadwal salat & adzan (minta izin lokasi, atau pilih kota)",
+                         "Prayer times & adhan (asks for location, or choose a city)"), isOn: $prayer.enabled)
+                Toggle(L("Rak file (seret file ke notch)", "File shelf (drag files onto the notch)"), isOn: $shelf.enabled)
+                Toggle(L("Catatan cepat", "Quick note"), isOn: $notes.enabled)
+                Toggle(L("Kamera cermin (kamera hanya menyala saat halamannya dibuka)",
+                         "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
+                Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",
+                         "Clipboard history (10 texts, never saved to disk)"), isOn: $clipboard.enabled)
+            }
+
             Section(L("Notch", "Notch")) {
                 Picker(L("Tampilkan di", "Show on"), selection: $vm.displayPreference) {
                     ForEach(DisplayPreference.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -127,15 +141,6 @@ struct GeneralSettings: View {
 
             Section(L("Musik", "Music")) {
                 Toggle(L("Pause otomatis app musik lain", "Auto-pause other music apps"), isOn: $player.autoPauseOthers)
-            }
-
-            Section(L("Modul di panel penuh", "Modules in the full panel")) {
-                Toggle(L("Rak file (seret file ke notch)", "File shelf (drag files onto the notch)"), isOn: $shelf.enabled)
-                Toggle(L("Catatan cepat", "Quick note"), isOn: $notes.enabled)
-                Toggle(L("Kamera cermin (kamera hanya menyala saat halamannya dibuka)",
-                         "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
-                Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",
-                         "Clipboard history (10 texts, never saved to disk)"), isOn: $clipboard.enabled)
             }
 
             Section(L("Perangkat", "Devices")) {

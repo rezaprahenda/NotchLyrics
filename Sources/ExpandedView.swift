@@ -4,6 +4,11 @@ import UniformTypeIdentifiers
 
 // MARK: - Expanded
 
+extension Notification.Name {
+    /// Minta AppDelegate membuka jendela Pengaturan (dari tombol "+" di tab).
+    static let popocuOpenSettings = Notification.Name("popocu.openSettings")
+}
+
 /// Halaman panel penuh (satu per modul).
 enum ExpandedPage: String, CaseIterable {
     case music, focus, prayer, shelf, notes, mirror, clipboard
@@ -126,6 +131,19 @@ struct PageTabs: View {
                 .help(p.title)
                 .accessibilityLabel(p.title)
             }
+            Button {
+                NotificationCenter.default.post(name: .popocuOpenSettings, object: nil)
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("Tambah modul (Salat, Cermin, Klip…)", "Add modules (Prayer, Mirror, Clipboard…)"))
+            .accessibilityLabel(L("Tambah modul", "Add modules"))
         }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.08)))
@@ -379,7 +397,7 @@ struct FocusPage: View {
     }
 
     var body: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 32) {
             TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
                 ZStack {
                     ProgressRing(progress: pomodoro.phase == .idle ? 0 : pomodoro.progress(at: ctx.date),
@@ -406,9 +424,9 @@ struct FocusPage: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
             }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Cincin + kontrol sebagai satu kelompok di tengah panel.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func clockText(at date: Date) -> String {
@@ -438,12 +456,19 @@ struct FocusPage: View {
                     .fill(i < pomodoro.cycleFocusDone ? Color.focusAccent : Color.white.opacity(0.18))
                     .frame(width: 7, height: 7)
             }
-            Text(L("sesi \(min(pomodoro.cycleFocusDone + (pomodoro.phase == .focus ? 1 : 0), total)) dari \(total)",
-                   "session \(min(pomodoro.cycleFocusDone + (pomodoro.phase == .focus ? 1 : 0), total)) of \(total)"))
+            Text(L("sesi \(sessionNumber(total)) dari \(total)", "session \(sessionNumber(total)) of \(total)"))
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(.leading, 4)
         }
+    }
+
+    /// Sesi yang sedang berjalan atau akan dimulai berikutnya; saat istirahat: sesi yang baru selesai.
+    private func sessionNumber(_ total: Int) -> Int {
+        let upcoming = pomodoro.phase == .focus
+            || pomodoro.waitingFor == .focus
+            || (pomodoro.phase == .idle && pomodoro.waitingFor == nil)
+        return min(max(pomodoro.cycleFocusDone + (upcoming ? 1 : 0), 1), total)
     }
 
     @ViewBuilder private var controls: some View {
