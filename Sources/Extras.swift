@@ -1,0 +1,322 @@
+import AppKit
+import SwiftUI
+import AVFoundation
+import Combine
+
+// MARK: - Catatan cepat
+
+/// Satu catatan tempel, tersimpan otomatis.
+final class NotesModule: ObservableObject {
+    @Published var enabled: Bool = Defaults.bool("notes.enabled", true) {
+        didSet { UserDefaults.standard.set(enabled, forKey: "notes.enabled") }
+    }
+    @Published var text: String = UserDefaults.standard.string(forKey: "notes.text") ?? "" {
+        didSet { scheduleSave() }
+    }
+    private var saveWork: DispatchWorkItem?
+
+    private func scheduleSave() {
+        saveWork?.cancel()
+        let value = text
+        let work = DispatchWorkItem { UserDefaults.standard.set(value, forKey: "notes.text") }
+        saveWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+}
+
+struct NotesPage: View {
+    @ObservedObject var notes: NotesModule
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: $notes.text)
+                .font(.system(size: 13))
+                .scrollContentBackground(.hidden)
+                .padding(8)
+            if notes.text.isEmpty {
+                Text(L("Tulis sesuatu… tersimpan otomatis.", "Write something… saved automatically."))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 8)
+                    .allowsHitTesting(false)
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.08)))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Kamera cermin
+
+final class MirrorModule: ObservableObject {
+    @Published var enabled: Bool = Defaults.bool("mirror.enabled", false) {
+        didSet { UserDefaults.standard.set(enabled, forKey: "mirror.enabled") }
+    }
+    @Published private(set) var denied = false
+
+    let session = AVCaptureSession()
+    private let queue = DispatchQueue(label: "popocu.camera")
+    private var configured = false
+
+    /// Kamera hanya menyala selama halaman Cermin terbuka.
+    func start() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            run()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                DispatchQueue.main.async {
+                    self.denied = !granted
+                    if granted { self.run() }
+                }
+            }
+        default:
+            denied = true
+        }
+    }
+
+    func stop() {
+        queue.async { if self.session.isRunning { self.session.stopRunning() } }
+    }
+
+    private func run() {
+        denied = false
+        queue.async {
+            if !self.configured {
+                self.session.beginConfiguration()
+                self.session.sessionPreset = .medium
+                if let device = AVCaptureDevice.default(for: .video),
+                   let input = try? AVCaptureDeviceInput(device: device),
+                   self.session.canAddInput(input) {
+                    self.session.addInput(input)
+                }
+                self.session.commitConfiguration()
+                self.configured = true
+            }
+            if !self.session.isRunning { self.session.startRunning() }
+        }
+    }
+}
+
+final class CameraPreviewView: NSView {
+    let previewLayer: AVCaptureVideoPreviewLayer
+
+    init(session: AVCaptureSession) {
+        previewLayer = AVCaptureVideoPreviewLayer(session: session)
+        super.init(frame: .zero)
+        wantsLayer = true
+        previewLayer.videoGravity = .resizeAspectFill
+        layer = previewLayer
+        // Seperti cermin: gambar dibalik kiri-kanan.
+        if let connection = previewLayer.connection, connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = true
+        }
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) tidak dipakai") }
+}
+
+struct CameraPreview: NSViewRepresentable {
+    let session: AVCaptureSession
+    func makeNSView(context: Context) -> CameraPreviewView { CameraPreviewView(session: session) }
+    func updateNSView(_ nsView: CameraPreviewView, context: Context) {}
+}
+
+struct MirrorPage: View {
+    @ObservedObject var mirror: MirrorModule
+
+    var body: some View {
+        Group {
+            if mirror.denied {
+                VStack(spacing: 8) {
+                    Image(systemName: "video.slash")
+                        .font(.system(size: 22))
+                    Text(L("Izin kamera ditolak. Aktifkan di System Settings › Privacy & Security › Camera.",
+                           "Camera access is off. Enable it in System Settings › Privacy & Security › Camera."))
+                        .font(.system(size: 12))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+            } else {
+                CameraPreview(session: mirror.session)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { mirror.start() }
+        .onDisappear { mirror.stop() }
+    }
+}
+
+// MARK: - Riwayat clipboard
+
+/// 10 teks terakhir yang disalin. Hanya di memori (tidak disimpan ke disk), dan melewati
+/// isi yang ditandai rahasia oleh password manager (org.nspasteboard.ConcealedType).
+final class ClipboardModule: ObservableObject {
+    @Published var enabled: Bool = Defaults.bool("clipboard.enabled", false) {
+        didSet {
+            UserDefaults.standard.set(enabled, forKey: "clipboard.enabled")
+            enabled ? start() : stop()
+        }
+    }
+    @Published private(set) var items: [String] = []
+    @Published private(set) var justCopied: String?
+
+    private var timer: Timer?
+    private var lastChange = NSPasteboard.general.changeCount
+    private static let skipped: Set<String> = ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType",
+                                               "org.nspasteboard.AutoGeneratedType"]
+
+    init() {
+        if enabled { start() }
+    }
+
+    private func start() {
+        timer?.invalidate()
+        lastChange = NSPasteboard.general.changeCount
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.check() }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    private func stop() {
+        timer?.invalidate()
+        timer = nil
+        items = []
+    }
+
+    private func check() {
+        let pb = NSPasteboard.general
+        guard pb.changeCount != lastChange else { return }
+        lastChange = pb.changeCount
+        let types = Set((pb.types ?? []).map(\.rawValue))
+        guard types.isDisjoint(with: Self.skipped),
+              let text = pb.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty, text.count < 20_000 else { return }
+        items.removeAll { $0 == text }
+        items.insert(text, at: 0)
+        if items.count > 10 { items.removeLast(items.count - 10) }
+    }
+
+    func copy(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        lastChange = pb.changeCount
+        items.removeAll { $0 == text }
+        items.insert(text, at: 0)
+        justCopied = text
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            if self?.justCopied == text { self?.justCopied = nil }
+        }
+    }
+
+    func clear() { items = [] }
+}
+
+struct ClipboardPage: View {
+    @ObservedObject var clipboard: ClipboardModule
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if clipboard.items.isEmpty {
+                Text(L("Teks yang kamu salin akan muncul di sini (10 terakhir, tidak disimpan ke disk).",
+                       "Text you copy appears here (last 10, never written to disk)."))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 4) {
+                        ForEach(clipboard.items, id: \.self) { item in
+                            Button { clipboard.copy(item) } label: {
+                                HStack {
+                                    Text(item)
+                                        .font(.system(size: 12))
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 6)
+                                    if clipboard.justCopied == item {
+                                        Text(L("Disalin", "Copied"))
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color.shelfAccent)
+                                    }
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.08)))
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                HStack {
+                    Text(L("Klik untuk menyalin lagi", "Click to copy again"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.5))
+                    Spacer()
+                    PeekButton(title: L("Hapus semua", "Clear all"), filled: false, tint: .shelfAccent) { clipboard.clear() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Salin / bagikan lirik
+
+enum LyricSharing {
+    static func copyText(_ text: String) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+
+    /// Kartu gambar: cover, baris lirik, judul & artis. Disalin ke clipboard sebagai gambar.
+    @MainActor
+    static func copyCard(line: String, title: String, artist: String, artwork: NSImage?, accent: Color) {
+        let card = LyricCard(line: line, title: title, artist: artist, artwork: artwork, accent: accent)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = 2
+        guard let image = renderer.nsImage else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([image])
+    }
+}
+
+struct LyricCard: View {
+    let line: String
+    let title: String
+    let artist: String
+    let artwork: NSImage?
+    let accent: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            HStack(spacing: 14) {
+                ArtworkView(image: artwork, size: 64, corner: 12)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 18, weight: .semibold))
+                    Text(artist).font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
+                }
+            }
+            Text(line)
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Rectangle().fill(accent).frame(width: 36, height: 4).clipShape(Capsule())
+                Spacer()
+                Text("popocu").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white.opacity(0.5))
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(32)
+        .frame(width: 560, alignment: .leading)
+        .background(Color(red: 0.07, green: 0.07, blue: 0.08))
+    }
+}

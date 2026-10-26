@@ -68,6 +68,17 @@ final class NotchViewModel: ObservableObject {
     @Published var hideFromScreenCapture: Bool = NotchViewModel.storedBool("hideFromScreenCapture", false) {
         didSet { UserDefaults.standard.set(hideFromScreenCapture, forKey: "hideFromScreenCapture") }
     }
+    /// Peek yang tidak penting (ganti lagu, perangkat, pengingat) diam saat mode Focus aktif.
+    @Published var respectFocus: Bool = NotchViewModel.storedBool("respectFocus", true) {
+        didSet {
+            UserDefaults.standard.set(respectFocus, forKey: "respectFocus")
+            if respectFocus { FocusStatus.requestAuthorizationIfNeeded() }
+        }
+    }
+    @Published var displayPreference: DisplayPreference =
+        DisplayPreference(rawValue: UserDefaults.standard.string(forKey: "displayPreference") ?? "") ?? .automatic {
+        didSet { UserDefaults.standard.set(displayPreference.rawValue, forKey: "displayPreference") }
+    }
     /// Shortcut keyboard global (⌃⌥L, ⌃⌥[, ⌃⌥]).
     @Published var shortcutsEnabled: Bool = NotchViewModel.storedBool("shortcutsEnabled", true) {
         didSet { UserDefaults.standard.set(shortcutsEnabled, forKey: "shortcutsEnabled") }
@@ -137,7 +148,9 @@ final class NotchViewModel: ObservableObject {
 /// Panel transparan di atas menu bar. Tidak pernah jadi key window,
 /// jadi tidak mencuri fokus keyboard dari app lain.
 final class NotchPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
+    /// Hanya boleh menerima ketikan saat halaman Catatan terbuka.
+    var allowsKey = false
+    override var canBecomeKey: Bool { allowsKey }
     override var canBecomeMain: Bool { false }
 }
 
@@ -155,6 +168,9 @@ final class NotchController {
     private let prayer: PrayerModule
     private let shelf: ShelfModule
     private let device: DeviceModule
+    private let notes: NotesModule
+    private let mirror: MirrorModule
+    private let clipboard: ClipboardModule
     /// changeCount papan seret saat tombol mouse ditekan; berubah = sedang menyeret sesuatu.
     private var dragStartChangeCount = NSPasteboard(name: .drag).changeCount
 
@@ -179,13 +195,17 @@ final class NotchController {
     private var pausedByPomodoro = false
 
     init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule,
-         shelf: ShelfModule, device: DeviceModule) {
+         shelf: ShelfModule, device: DeviceModule, notes: NotesModule, mirror: MirrorModule,
+         clipboard: ClipboardModule) {
         self.player = player
         self.lyrics = lyrics
         self.pomodoro = pomodoro
         self.prayer = prayer
         self.shelf = shelf
         self.device = device
+        self.notes = notes
+        self.mirror = mirror
+        self.clipboard = clipboard
 
         let size = NotchViewModel.windowSize
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -203,7 +223,8 @@ final class NotchController {
         panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = true
 
-        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf)
+        let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf,
+                                 notes: notes, mirror: mirror, clipboard: clipboard)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -259,6 +280,28 @@ final class NotchController {
 
         startCoordinator()
 
+        // Halaman Catatan: panel boleh menerima ketikan; selain itu tidak pernah mencuri fokus.
+        vm.$isExpanded.combineLatest(vm.$expandedPage)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] expanded, page in
+                guard let self else { return }
+                let typing = expanded && page == .notes
+                self.panel.allowsKey = typing
+                if typing {
+                    self.panel.makeKey()
+                } else if self.panel.isKeyWindow {
+                    self.panel.resignKey()
+                }
+            }
+            .store(in: &ownerCancellables)
+
+        vm.$displayPreference
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.reposition() }
+            .store(in: &ownerCancellables)
+        if vm.respectFocus { FocusStatus.requestAuthorizationIfNeeded() }
+
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main
@@ -269,9 +312,9 @@ final class NotchController {
 
     /// Cari layar yang punya notch, hitung ukuran notch, taruh panel di tengah atas.
     private func reposition() {
-        let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
-            ?? NSScreen.main
-            ?? NSScreen.screens.first
+        let notched = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })
+        let primary = NSScreen.screens.first // layar dengan menu bar utama
+        let screen = vm.displayPreference == .automatic ? (notched ?? primary ?? NSScreen.main) : (primary ?? NSScreen.main)
         guard let screen else { return }
         currentScreen = screen
 
@@ -499,6 +542,10 @@ final class NotchController {
 
     /// Masukkan peek ke antrian; tampil kalau tidak ada peek lain.
     func post(_ event: PeekEvent) {
+        // Mode Focus: hanya peek penting (salat, pomodoro) yang tetap muncul.
+        if vm.respectFocus, [.trackChange, .device, .reminder].contains(event.kind), FocusStatus.isFocused {
+            return
+        }
         peekQueue.push(event)
         presentNextPeek()
     }

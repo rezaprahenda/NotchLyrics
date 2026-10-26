@@ -166,6 +166,19 @@ struct SyncedLyricsView: View {
                                 hovered = nil
                             }
                         }
+                        .contextMenu {
+                            Button(L("Salin baris", "Copy line")) { LyricSharing.copyText(line.text) }
+                            Button(L("Salin semua lirik", "Copy all lyrics")) {
+                                LyricSharing.copyText(lines.map(\.text).joined(separator: "\n"))
+                            }
+                            Button(L("Salin sebagai gambar", "Copy as image")) {
+                                LyricSharing.copyCard(line: line.text,
+                                                      title: player.track?.title ?? "",
+                                                      artist: player.track?.artist ?? "",
+                                                      artwork: player.artwork,
+                                                      accent: player.track?.source.tint ?? .white)
+                            }
+                        }
                         .id(line.id)
                     }
                     Color.clear.frame(height: 30)

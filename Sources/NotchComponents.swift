@@ -230,14 +230,17 @@ struct ArtworkView: View {
 struct EqualizerView: View {
     let isPlaying: Bool
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isPlaying)) { ctx in
+        // Reduce Motion: batang diam (tinggi tetap), tanpa animasi.
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isPlaying || reduceMotion)) { ctx in
             let t = ctx.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2.5) {
                 ForEach(0..<4, id: \.self) { i in
                     let phase = t * (4.2 + Double(i) * 1.3) + Double(i) * 1.7
-                    let h = isPlaying ? 0.35 + 0.65 * abs(sin(phase)) : 0.25
+                    let h = reduceMotion ? (isPlaying ? [0.5, 0.9, 0.65, 0.8][i] : 0.25)
+                        : (isPlaying ? 0.35 + 0.65 * abs(sin(phase)) : 0.25)
                     Capsule()
                         .fill(color.opacity(0.9))
                         .frame(width: 2.6, height: 14 * h)

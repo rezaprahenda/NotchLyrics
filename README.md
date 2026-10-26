@@ -17,18 +17,33 @@
 
 ## Features
 
-- **Synced lyrics** under the notch, with a full lyrics view on hover
+**Music & lyrics**
+- **Synced lyrics** under the notch, with a full lyrics view on hover, optional **karaoke** fill
 - **Playback controls**: play/pause, skip, seek, volume, shuffle and repeat
 - **Romanization** for Japanese, Korean, Chinese and other non-Latin lyrics
 - **Translation** of lyrics into 8 languages, on-device (macOS 15+)
-- **English and Indonesian** interface
-- **Lyrics picker** to choose a different version when a match is wrong
-- **Stays out of the way**: click-through lyrics that fade as your cursor approaches
-- **Extras**: track-change banner, sleep timer, launch at login, offline cache
+- **Lyrics picker**, copy a line or the whole song, or copy a lyric **card as an image**
+- **Last.fm scrobbling** (bring your own free API key)
+
+**Around the notch**
+- **Pomodoro** with focus/break cycles, daily stats, water & stand-up reminders
+- **Prayer times & adhan** (Indonesian Ministry of Religious Affairs method), automatic location
+  or 23 cities, Ramadan mode with Imsak and an iftar countdown; silent while your mic is in use
+- **File shelf**: drag files onto the notch, drag them out later, or AirDrop them
+- **Quick note**, **camera mirror** and **clipboard history** (optional)
+- **Charger, low battery and Bluetooth headphone** banners
+
+**Stays out of the way**
+- One thing at a time: a clear priority between music, focus and prayer
+- Click-through lyrics that fade as your cursor approaches; each side of the notch slides away
+  when you need the menu bar behind it
+- Quiet during macOS Focus, respects Reduce Motion, hides from screen sharing (optional)
+- A menu bar face that changes expression: peeking, looking up, focused, asleep
+- English and Indonesian interface
 
 ## Requirements
 
-- macOS 14 Sonoma or later (translation requires macOS 15)
+- macOS 14 Sonoma or later (lyric translation requires macOS 15)
 - A MacBook with a notch (other Macs show a compact pill at the top of the screen)
 - Spotify desktop app and/or Apple Music
 
@@ -75,7 +90,10 @@ for permission to control Spotify or Music, and "Open at login" needs to be swit
 
 popocu has no account, analytics or tracking. It sends the track title, artist,
 album and duration to [LRCLIB](https://lrclib.net) to fetch lyrics, and to the iTunes
-Search API to fetch artwork when needed. Romanization and translation run on-device.
+Search API to fetch artwork when needed. Romanization, translation and prayer times run
+on-device; with automatic location, the city name is looked up through Apple's maps service.
+Last.fm only receives what you play if you connect it. Clipboard history stays in memory and
+skips items marked as passwords. The camera mirror only runs while its page is open.
 
 ## Acknowledgements
 

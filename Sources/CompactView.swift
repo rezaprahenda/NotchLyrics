@@ -11,6 +11,7 @@ struct CompactView: View {
     @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
     let showLine: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,8 +53,9 @@ struct CompactView: View {
                             }
                         }
                         .id(idx ?? -1)
-                        .transition(.asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
-                                                removal: .opacity))
+                        .transition(reduceMotion ? .opacity
+                                    : .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity),
+                                                  removal: .opacity))
                     }
                     .animation(.easeOut(duration: 0.25), value: idx)
                 }

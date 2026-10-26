@@ -151,7 +151,12 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 
 ## 9. Urutan rilis
 
-1. **1.2** ✅ (build & tes manual berhasil): akurasi lirik, retry jaringan, hemat baterai, telinga per sisi, lokalisasi en/id, bahasa terjemahan, hapus cache.
-2. **1.3** ✅: karaoke (opsi), warna cover (opsi), sembunyi saat share screen, hide per sisi penuh (telinga + baris), shortcut keyboard.
-3. **2.0, nama baru**: arsitektur modul, jendela Pengaturan, Pomodoro, Salat & adzan (+mode Ramadan), Rak file, Baterai & AirPods.
-4. **2.x**: Last.fm, salin/bagikan lirik, catatan cepat, kamera cermin, clipboard. Kalender nanti saja, kalau dibutuhkan.
+1. **1.2** ✅ akurasi lirik, retry jaringan, hemat baterai, lokalisasi en/id, bahasa terjemahan, hapus cache.
+2. **1.3** ✅ karaoke, warna cover, sembunyi saat share screen, sisi notch menyingkir, shortcut keyboard.
+3. **2.0 popocu** (branch `dev`, CI hijau, menunggu tes): nama & ikon baru, ekspresi menu bar, migrasi,
+   tes otomatis, koordinator prioritas & antrian peek, jendela Pengaturan, tab panel penuh,
+   Pomodoro (+ pengingat minum/berdiri), Salat & adzan (+ mode Ramadan), Rak file, peek baterai &
+   headphone, Catatan cepat, Kamera cermin, riwayat clipboard, salin/bagikan lirik, Last.fm,
+   mode Focus, Reduce Motion, pilihan layar.
+4. **Belum**: notarisasi Apple (butuh akun Developer), update otomatis Sparkle (butuh kunci tanda
+   tangan & tempat hosting appcast), Kalender (ditunda sampai dibutuhkan).

@@ -8,10 +8,12 @@ final class SettingsWindowController {
     private var window: NSWindow?
 
     func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule,
-              prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule) {
+              prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule, notes: NotesModule,
+              mirror: MirrorModule, clipboard: ClipboardModule, lastfm: LastFMModule) {
         if window == nil {
             let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
-                                    shelf: shelf, device: device)
+                                    shelf: shelf, device: device, notes: notes, mirror: mirror,
+                                    clipboard: clipboard, lastfm: lastfm)
             let host = NSHostingController(rootView: view)
             let w = NSWindow(contentViewController: host)
             w.title = L("Pengaturan popocu", "popocu Settings")
@@ -44,19 +46,24 @@ struct SettingsView: View {
     @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
     @ObservedObject var device: DeviceModule
+    @ObservedObject var notes: NotesModule
+    @ObservedObject var mirror: MirrorModule
+    @ObservedObject var clipboard: ClipboardModule
+    @ObservedObject var lastfm: LastFMModule
 
     var body: some View {
         TabView {
-            GeneralSettings(vm: vm, player: player, lyrics: lyrics, shelf: shelf, device: device)
+            GeneralSettings(vm: vm, player: player, lyrics: lyrics, shelf: shelf, device: device,
+                            notes: notes, mirror: mirror, clipboard: clipboard)
                 .tabItem { Label(L("Umum", "General"), systemImage: "gearshape") }
-            MusicSettings(vm: vm, lyrics: lyrics)
+            MusicSettings(vm: vm, lyrics: lyrics, lastfm: lastfm)
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
             FocusSettings(pomodoro: pomodoro)
                 .tabItem { Label(L("Fokus", "Focus"), systemImage: "timer") }
             PrayerSettings(prayer: prayer)
                 .tabItem { Label(L("Salat", "Prayer"), systemImage: "moon.stars") }
         }
-        .frame(width: 520, height: 470)
+        .frame(width: 540, height: 520)
     }
 }
 
@@ -68,6 +75,9 @@ struct GeneralSettings: View {
     @ObservedObject var lyrics: LyricsStore
     @ObservedObject var shelf: ShelfModule
     @ObservedObject var device: DeviceModule
+    @ObservedObject var notes: NotesModule
+    @ObservedObject var mirror: MirrorModule
+    @ObservedObject var clipboard: ClipboardModule
     @State private var language = AppLanguage.current
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var confirmClear = false
@@ -100,7 +110,12 @@ struct GeneralSettings: View {
             }
 
             Section(L("Notch", "Notch")) {
+                Picker(L("Tampilkan di", "Show on"), selection: $vm.displayPreference) {
+                    ForEach(DisplayPreference.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
                 Toggle(L("Notifikasi ganti lagu", "Track change banner"), isOn: $vm.showTrackPeek)
+                Toggle(L("Diam saat mode Focus aktif (kecuali salat & pomodoro)",
+                         "Stay quiet during Focus (except prayer & pomodoro)"), isOn: $vm.respectFocus)
                 Toggle(L("Sembunyikan saat share screen & rekam layar", "Hide during screen sharing & recording"),
                        isOn: $vm.hideFromScreenCapture)
                 Toggle(L("Shortcut keyboard", "Keyboard shortcuts"), isOn: $vm.shortcutsEnabled)
@@ -114,8 +129,16 @@ struct GeneralSettings: View {
                 Toggle(L("Pause otomatis app musik lain", "Auto-pause other music apps"), isOn: $player.autoPauseOthers)
             }
 
-            Section(L("Rak file & perangkat", "Shelf & devices")) {
+            Section(L("Modul di panel penuh", "Modules in the full panel")) {
                 Toggle(L("Rak file (seret file ke notch)", "File shelf (drag files onto the notch)"), isOn: $shelf.enabled)
+                Toggle(L("Catatan cepat", "Quick note"), isOn: $notes.enabled)
+                Toggle(L("Kamera cermin (kamera hanya menyala saat halamannya dibuka)",
+                         "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
+                Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",
+                         "Clipboard history (10 texts, never saved to disk)"), isOn: $clipboard.enabled)
+            }
+
+            Section(L("Perangkat", "Devices")) {
                 Toggle(L("Notifikasi charger & baterai lemah", "Charger & low battery banners"), isOn: $device.batteryAlerts)
                 Toggle(L("Notifikasi headphone Bluetooth tersambung", "Bluetooth headphones connected banner"),
                        isOn: $device.audioAlerts)
@@ -152,6 +175,7 @@ struct GeneralSettings: View {
 struct MusicSettings: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var lyrics: LyricsStore
+    @ObservedObject var lastfm: LastFMModule
 
     var body: some View {
         Form {
@@ -183,6 +207,36 @@ struct MusicSettings: View {
             Section(L("Terjemahan", "Translation")) {
                 Picker(L("Terjemahkan ke", "Translate to"), selection: $lyrics.translationTarget) {
                     ForEach(LyricsStore.translationTargets, id: \.self) { Text(languageName($0)).tag($0) }
+                }
+            }
+
+            Section("Last.fm") {
+                if lastfm.isConnected {
+                    HStack {
+                        Text(L("Tersambung sebagai \(lastfm.username ?? "")", "Connected as \(lastfm.username ?? "")"))
+                        Spacer()
+                        Button(L("Putuskan", "Disconnect")) { lastfm.disconnect() }
+                    }
+                    Toggle(L("Hanya Apple Music (Spotify bisa scrobble sendiri)", "Apple Music only (Spotify scrobbles on its own)"),
+                           isOn: $lastfm.onlyAppleMusic)
+                } else {
+                    TextField("API key", text: $lastfm.apiKey)
+                    SecureField("Shared secret", text: $lastfm.apiSecret)
+                    HStack {
+                        Link(L("Buat API key gratis…", "Get a free API key…"),
+                             destination: URL(string: "https://www.last.fm/api/account/create")!)
+                        Spacer()
+                        if lastfm.awaitingApproval {
+                            Button(L("Selesai", "Done")) { lastfm.finishAuth() }
+                        } else {
+                            Button(L("Hubungkan", "Connect")) { lastfm.beginAuth() }
+                        }
+                    }
+                }
+                if !lastfm.status.isEmpty {
+                    Text(lastfm.status)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
