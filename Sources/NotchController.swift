@@ -41,6 +41,9 @@ final class NotchViewModel: ObservableObject {
     @Published var frontWindowFillsScreen = false
     @Published var lyricLineFaded = false
     @Published var lyricLineSuppressed = false
+    /// Kursor ada di menu bar dekat telinga notch → telinga disusutkan supaya menu app
+    /// (mis. "Server" di Tableau) yang tertutup bisa terlihat dan diklik.
+    @Published var earsHidden = false
 
     private static func storedBool(_ key: String, _ defaultValue: Bool) -> Bool {
         (UserDefaults.standard.object(forKey: key) as? Bool) ?? defaultValue
@@ -76,7 +79,7 @@ final class NotchViewModel: ObservableObject {
         case .idle:
             return notchSize
         case .compact:
-            return CGSize(width: baseWidth + earWidth * 2,
+            return CGSize(width: baseWidth + (earsHidden ? 0 : earWidth * 2),
                           height: notchSize.height
                             + (showsLyricLine ? (doubleLine ? compactDoubleLyricHeight : compactLyricHeight) : 0))
         case .peek:
@@ -252,8 +255,9 @@ final class NotchController {
     }
 
     private func updateHover() {
-        let z = zones()
         let mouse = NSEvent.mouseLocation
+        updateEars(mouse)
+        let z = zones()
 
         var activeRect = z.full
         var faded = false
@@ -277,6 +281,26 @@ final class NotchController {
             panel.ignoresMouseEvents = !inside
         }
         schedule(expand: inside)
+    }
+
+    /// Susutkan telinga (cover + equalizer) saat kursor berada di menu bar di sebelah notch.
+    /// Zonanya dihitung dari lebar telinga penuh, jadi tidak kedip-kedip saat telinga menyusut.
+    private func updateEars(_ mouse: NSPoint) {
+        let compact = vm.mode(hasTrack: player.track != nil) == .compact
+        var hide = false
+        if compact {
+            let f = panel.frame
+            let barHeight = vm.notchSize.height
+            let fullWidth = vm.baseWidth + vm.earWidth * 2
+            let earZone = NSRect(x: f.midX - fullWidth / 2 - 8, y: f.maxY - barHeight,
+                                 width: fullWidth + 16, height: barHeight + 1)
+            let notch = NSRect(x: f.midX - vm.baseWidth / 2, y: f.maxY - barHeight,
+                               width: vm.baseWidth, height: barHeight + 1)
+            hide = earZone.contains(mouse) && !notch.contains(mouse)
+        }
+        if vm.earsHidden != hide {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { vm.earsHidden = hide }
+        }
     }
 
     /// Tampilkan judul + artis sebentar saat lagu berganti (tidak saat app baru dibuka).

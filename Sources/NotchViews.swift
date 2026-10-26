@@ -107,14 +107,17 @@ struct CompactView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Saat telinga disusutkan, isinya tidak dirender supaya tidak memaksa lebar view.
             HStack(spacing: 0) {
-                ArtworkView(image: player.artwork, size: 20, corner: 5)
-                Spacer(minLength: vm.baseWidth)
-                EqualizerView(isPlaying: player.isPlaying,
-                              color: player.track?.source.tint ?? .white)
-                    .frame(width: 20, height: 14)
+                if !vm.earsHidden {
+                    ArtworkView(image: player.artwork, size: 20, corner: 5)
+                    Spacer(minLength: vm.baseWidth)
+                    EqualizerView(isPlaying: player.isPlaying,
+                                  color: player.track?.source.tint ?? .white)
+                        .frame(width: 20, height: 14)
+                }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, vm.earsHidden ? 0 : 14)
             .frame(height: vm.notchSize.height)
 
             if showLine, let lines = lyrics.state.syncedLines {
