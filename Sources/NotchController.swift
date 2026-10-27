@@ -127,6 +127,9 @@ final class NotchViewModel: ObservableObject {
                           height: notchSize.height
                             + (showsLyricLine ? (doubleLine ? compactDoubleLyricHeight : compactLyricHeight) : 0))
         case .peek:
+            if activePeek?.compact == true {
+                return CGSize(width: baseWidth + earWidth * 2, height: notchSize.height)
+            }
             return CGSize(width: max(baseWidth + earWidth * 2, 380),
                           height: notchSize.height + peekHeight)
         case .expanded:
@@ -139,7 +142,7 @@ final class NotchViewModel: ObservableObject {
         switch mode {
         case .hidden, .idle: return 10
         case .compact: return 14
-        case .peek: return 20
+        case .peek: return activePeek?.compact == true ? 14 : 20
         case .expanded: return 26
         }
     }

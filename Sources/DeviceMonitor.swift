@@ -57,16 +57,8 @@ final class DeviceModule: ObservableObject {
         guard batteryAlerts else { return }
 
         if let last = lastExternal, last != p.external {
-            if p.external {
-                let subtitle = p.minutesToFull.map { m in
-                    let h = m / 60, mm = m % 60
-                    return h > 0 ? L("Penuh sekitar \(h) j \(mm) m", "Full in about \(h)h \(mm)m")
-                                 : L("Penuh sekitar \(mm) menit", "Full in about \(mm) min")
-                } ?? ""
-                post(L("Mengisi daya · \(p.percent)%", "Charging · \(p.percent)%"), subtitle, "battery.100percent.bolt")
-            } else {
-                post(L("Charger dicabut · \(p.percent)%", "Unplugged · \(p.percent)%"), "", symbol(for: p.percent))
-            }
+            // Gaya iPhone: notch tidak melebar, baterai di kiri & persentase di kanan.
+            postBattery(p.percent, charging: p.external)
         }
 
         if p.external {
@@ -74,8 +66,7 @@ final class DeviceModule: ObservableObject {
         } else {
             for threshold in [5, 10] where p.percent <= threshold && !lowAlerted.contains(threshold) {
                 lowAlerted.formUnion([5, 10].filter { $0 >= threshold })
-                post(L("Baterai lemah · \(p.percent)%", "Battery low · \(p.percent)%"),
-                     L("Colokkan charger", "Plug in the charger"), "battery.25percent")
+                postBattery(p.percent, charging: false)
                 break
             }
         }
@@ -147,6 +138,11 @@ final class DeviceModule: ObservableObject {
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &name) == noErr,
               let value = name?.takeRetainedValue() else { return nil }
         return value as String
+    }
+
+    private func postBattery(_ percent: Int, charging: Bool) {
+        onPeek?(PeekEvent(kind: .device, id: "battery", createdAt: Date(), title: "\(percent)%",
+                          symbol: charging ? "bolt" : "", level: Double(percent) / 100, compact: true))
     }
 
     private func post(_ title: String, _ subtitle: String, _ symbol: String) {

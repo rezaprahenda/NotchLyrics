@@ -103,7 +103,7 @@ struct CompactView: View {
             TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
                 ZStack {
                     ProgressRing(progress: pomodoro.phase == .idle ? 1 : pomodoro.progress(at: ctx.date),
-                                 color: pomodoro.phase.isBreak ? .prayerAccent : .focusAccent)
+                                 color: pomodoro.phase.isBreak ? .breakAccent : .focusAccent)
                     if player.track != nil {
                         ArtworkView(image: player.artwork, size: 15, corner: 4)
                     } else {
@@ -145,7 +145,7 @@ struct CompactView: View {
             }
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(pomodoro.phase.isBreak ? Color.prayerAccent : Color.focusAccent)
+            .foregroundStyle(pomodoro.phase.isBreak ? Color.breakAccent : Color.focusAccent)
             .lineLimit(1)
             .fixedSize()
         } else {

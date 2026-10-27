@@ -337,60 +337,93 @@ struct PrayerPage: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            HStack(alignment: .top, spacing: 20) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(prayer.placeName.isEmpty ? L("Lokasi", "Location") : prayer.placeName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .lineLimit(1)
-                    Text(L("Kemenag · \(prayer.locationMode == .automatic ? "otomatis" : "manual")",
-                           "Kemenag · \(prayer.locationMode == .automatic ? "automatic" : "manual")"))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.6))
-                    Text(prayer.hijriDate)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.6))
-                    Spacer(minLength: 6)
-                    if let next = prayer.next(after: prayer.now) {
-                        Text(countdown(to: next.time))
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(Color.prayerAccent)
-                        Text(next.prayer == .maghrib && prayer.isRamadan
-                             ? L("menuju berbuka", "until iftar")
-                             : L("menuju \(next.prayer.title)", "until \(next.prayer.title)"))
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                }
-                .frame(width: 150, alignment: .leading)
-
-                VStack(spacing: 2) {
-                    let next = prayer.next(after: prayer.now)?.prayer
-                    ForEach(rows, id: \.self) { p in
-                        let isNext = p == next
-                        HStack {
-                            Text(p.title)
-                            Spacer()
-                            Text(prayer.timeText(prayer.today[p]))
-                                .monospacedDigit()
-                        }
-                        .font(.system(size: 13, weight: isNext ? .semibold : .regular))
-                        .foregroundStyle(isNext ? Color.prayerAccent : .white.opacity(p.isObligatory ? 0.9 : 0.55))
-                        .padding(.horizontal, 10)
-                        .frame(height: 24)
-                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(isNext ? Color.prayerAccent.opacity(0.16) : .clear))
-                    }
-                }
+            HStack(spacing: 14) {
+                nextCard
+                    .frame(width: 196)
+                    .frame(maxHeight: .infinity)
+                timetable
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// Kartu "berikutnya": nama waktu, jam besar, hitung mundur, progres sejak waktu sebelumnya.
+    @ViewBuilder private var nextCard: some View {
+        let now = prayer.now
+        VStack(alignment: .leading, spacing: 3) {
+            Text(L("BERIKUTNYA", "NEXT"))
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(Color.prayerAccent.opacity(0.9))
+            if let next = prayer.next(after: now) {
+                Text(next.prayer == .maghrib && prayer.isRamadan ? L("Maghrib · berbuka", "Maghrib · iftar") : next.prayer.title)
+                    .font(.system(size: 15, weight: .semibold))
+                Text(prayer.timeText(next.time))
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.prayerAccent)
+                Text(L("\(countdown(to: next.time)) lagi", "in \(countdown(to: next.time))"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                Spacer(minLength: 6)
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.12))
+                        Capsule().fill(Color.prayerAccent)
+                            .frame(width: g.size.width * progress(until: next.time, now: now))
+                    }
+                }
+                .frame(height: 4)
+            }
+            Spacer(minLength: 6)
+            Text(prayer.placeName.isEmpty ? prayer.hijriDate : "\(prayer.placeName) · \(prayer.hijriDate)")
+                .font(.system(size: 10.5))
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(2)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.prayerAccent.opacity(0.12)))
+    }
+
+    /// Daftar waktu, dibagi rata dari atas ke bawah; yang sudah lewat diredupkan.
+    private var timetable: some View {
+        let now = prayer.now
+        let next = prayer.next(after: now)?.prayer
+        return VStack(spacing: 2) {
+            ForEach(rows, id: \.self) { p in
+                let isNext = p == next
+                let passed = (prayer.today[p] ?? .distantFuture) < now && !isNext
+                HStack {
+                    Text(p.title)
+                    Spacer()
+                    Text(prayer.timeText(prayer.today[p]))
+                        .monospacedDigit()
+                }
+                .font(.system(size: 13, weight: isNext ? .semibold : .regular))
+                .foregroundStyle(isNext ? Color.prayerAccent
+                                 : .white.opacity(passed ? 0.35 : (p.isObligatory ? 0.9 : 0.55)))
+                .padding(.horizontal, 12)
+                .frame(maxHeight: .infinity)
+                .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isNext ? Color.prayerAccent.opacity(0.16) : .clear))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func countdown(to date: Date) -> String {
         let minutes = max(Int((date.timeIntervalSince(prayer.now) / 60).rounded(.up)), 0)
         let h = minutes / 60, m = minutes % 60
         return h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) menit", "\(m) min")
+    }
+
+    /// Progres dari waktu salat sebelumnya (atau tengah malam) menuju waktu berikutnya.
+    private func progress(until next: Date, now: Date) -> Double {
+        let start = prayer.last(before: now)?.time ?? Calendar.current.startOfDay(for: now)
+        let total = next.timeIntervalSince(start)
+        guard total > 0 else { return 0 }
+        return min(max(now.timeIntervalSince(start) / total, 0), 1)
     }
 }
 
@@ -401,40 +434,40 @@ struct FocusPage: View {
 
     private var accent: Color {
         let phase = pomodoro.phase == .idle ? (pomodoro.waitingFor ?? .focus) : pomodoro.phase
-        return phase.isBreak ? .prayerAccent : .focusAccent
+        return phase.isBreak ? .breakAccent : .focusAccent
     }
 
     var body: some View {
-        HStack(spacing: 32) {
+        HStack(spacing: 22) {
             TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
                 ZStack {
                     ProgressRing(progress: pomodoro.phase == .idle ? 0 : pomodoro.progress(at: ctx.date),
-                                 color: accent, lineWidth: 7)
+                                 color: accent, lineWidth: 9)
                     VStack(spacing: 2) {
                         Text(clockText(at: ctx.date))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
                             .monospacedDigit()
                         Text(phaseLabel)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(accent)
                     }
                 }
-                .frame(width: 128, height: 128)
+                .frame(width: 164, height: 164)
             }
 
-            VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 12) {
                 sessionDots
                 controls
                 if pomodoro.phase == .idle && pomodoro.waitingFor == nil {
                     presets
                 }
-                Text(statsText)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                Spacer(minLength: 0)
+                stats
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        // Cincin + kontrol sebagai satu kelompok di tengah panel.
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func clockText(at date: Date) -> String {
@@ -460,13 +493,13 @@ struct FocusPage: View {
         let total = max(pomodoro.settings.sessionsBeforeLongBreak, 1)
         return HStack(spacing: 5) {
             ForEach(0..<total, id: \.self) { i in
-                Circle()
+                Capsule()
                     .fill(i < pomodoro.cycleFocusDone ? Color.focusAccent : Color.white.opacity(0.18))
-                    .frame(width: 7, height: 7)
+                    .frame(width: 18, height: 5)
             }
             Text(L("sesi \(sessionNumber(total)) dari \(total)", "session \(sessionNumber(total)) of \(total)"))
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.white.opacity(0.65))
                 .padding(.leading, 4)
         }
     }
@@ -508,11 +541,30 @@ struct FocusPage: View {
         }
     }
 
-    private var statsText: String {
+    /// Dua kartu statistik hari ini.
+    private var stats: some View {
         let h = pomodoro.todayFocusMinutes / 60
         let m = pomodoro.todayFocusMinutes % 60
-        let time = h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) menit", "\(m) min")
-        return L("Hari ini: \(pomodoro.todaySessions) sesi · \(time)", "Today: \(pomodoro.todaySessions) sessions · \(time)")
+        let time = h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) mnt", "\(m) min")
+        return HStack(spacing: 8) {
+            statTile(value: "\(pomodoro.todaySessions)", label: L("sesi hari ini", "sessions today"))
+            statTile(value: time, label: L("waktu fokus", "focus time"))
+        }
+    }
+
+    private func statTile(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
     }
 }
 

@@ -83,6 +83,10 @@ struct PeekEvent: Equatable {
     var subtitle = ""
     /// Nama SF Symbol (kosong = ikon bawaan jenisnya).
     var symbol = ""
+    /// Level 0…1 (mis. baterai) untuk peek ringkas.
+    var level: Double?
+    /// Peek ringkas: notch tidak melebar, isi hanya di telinga (gaya pengisian daya iPhone).
+    var compact = false
 }
 
 /// Satu peek tampil pada satu waktu; sisanya antre (maks. 3) menurut prioritas.

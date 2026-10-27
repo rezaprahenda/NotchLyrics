@@ -10,6 +10,39 @@ struct PeekView: View {
     @ObservedObject var prayer: PrayerModule
 
     var body: some View {
+        if let peek = vm.activePeek, peek.compact {
+            compactRow(peek)
+        } else {
+            fullBody
+        }
+    }
+
+    /// Peek ringkas: isi hanya di telinga kiri & kanan, notch tidak melebar.
+    private func compactRow(_ peek: PeekEvent) -> some View {
+        HStack(spacing: 0) {
+            Group {
+                if let level = peek.level {
+                    BatteryGlyph(level: level, charging: peek.symbol == "bolt")
+                } else {
+                    Image(systemName: peek.symbol.isEmpty ? symbol(for: peek) : peek.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(tint(for: peek))
+                }
+            }
+            .frame(width: 26, alignment: .leading)
+            Spacer(minLength: vm.baseWidth)
+            Text(peek.title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(BatteryGlyph.color(level: peek.level ?? 1, charging: peek.symbol == "bolt"))
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: vm.notchSize.height)
+    }
+
+    private var fullBody: some View {
         VStack(spacing: 0) {
             Color.clear.frame(height: vm.notchSize.height)
             if let peek = vm.activePeek {
@@ -96,7 +129,7 @@ struct PeekView: View {
 
     private func tint(for peek: PeekEvent) -> Color {
         switch peek.kind {
-        case .pomodoro: return pomodoro.waitingFor?.isBreak == true ? .prayerAccent : .focusAccent
+        case .pomodoro: return pomodoro.waitingFor?.isBreak == true ? .breakAccent : .focusAccent
         case .reminder: return .reminderAccent
         case .device: return .deviceAccent
         case .prayer: return .prayerAccent
