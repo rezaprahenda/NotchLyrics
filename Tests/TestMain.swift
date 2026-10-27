@@ -37,6 +37,7 @@ struct TestMain {
         pomodoroTests()
         prayerTests()
         lastFMTests()
+        notecuTests()
         print("\n\(checks) pemeriksaan, \(failures) gagal")
         exit(failures == 0 ? 0 : 1)
     }

@@ -50,6 +50,7 @@ struct NotchRootView: View {
     let notes: NotesModule
     let mirror: MirrorModule
     let clipboard: ClipboardModule
+    let notecu: NotecuModule
 
     var body: some View {
         let mode = vm.mode()
@@ -90,7 +91,7 @@ struct NotchRootView: View {
             switch mode {
             case .expanded:
                 ExpandedView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf,
-                             notes: notes, mirror: mirror, clipboard: clipboard)
+                             notes: notes, mirror: mirror, clipboard: clipboard, notecu: notecu)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
             case .compact:
                 CompactView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf, showLine: showLine)

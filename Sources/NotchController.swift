@@ -171,6 +171,7 @@ final class NotchController {
     private let notes: NotesModule
     private let mirror: MirrorModule
     private let clipboard: ClipboardModule
+    private let notecu: NotecuModule
     /// changeCount papan seret saat tombol mouse ditekan; berubah = sedang menyeret sesuatu.
     private var dragStartChangeCount = NSPasteboard(name: .drag).changeCount
 
@@ -196,7 +197,7 @@ final class NotchController {
 
     init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule,
          shelf: ShelfModule, device: DeviceModule, notes: NotesModule, mirror: MirrorModule,
-         clipboard: ClipboardModule) {
+         clipboard: ClipboardModule, notecu: NotecuModule) {
         self.player = player
         self.lyrics = lyrics
         self.pomodoro = pomodoro
@@ -206,6 +207,7 @@ final class NotchController {
         self.notes = notes
         self.mirror = mirror
         self.clipboard = clipboard
+        self.notecu = notecu
 
         let size = NotchViewModel.windowSize
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: size),
@@ -224,7 +226,7 @@ final class NotchController {
         panel.ignoresMouseEvents = true
 
         let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf,
-                                 notes: notes, mirror: mirror, clipboard: clipboard)
+                                 notes: notes, mirror: mirror, clipboard: clipboard, notecu: notecu)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
