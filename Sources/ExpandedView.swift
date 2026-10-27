@@ -11,7 +11,7 @@ extension Notification.Name {
 
 /// Halaman panel penuh (satu per modul).
 enum ExpandedPage: String, CaseIterable {
-    case music, focus, prayer, shelf, notes, mirror, clipboard
+    case music, focus, prayer, shelf, mirror, clipboard
 
     var title: String {
         switch self {
@@ -19,7 +19,6 @@ enum ExpandedPage: String, CaseIterable {
         case .focus: return L("Fokus", "Focus")
         case .prayer: return L("Salat", "Prayer")
         case .shelf: return L("Rak", "Shelf")
-        case .notes: return L("Catatan", "Notes")
         case .mirror: return L("Cermin", "Mirror")
         case .clipboard: return L("Klip", "Clipboard")
         }
@@ -31,7 +30,6 @@ enum ExpandedPage: String, CaseIterable {
         case .focus: return "timer"
         case .prayer: return "moon.stars"
         case .shelf: return "tray"
-        case .notes: return "note.text"
         case .mirror: return "camera"
         case .clipboard: return "doc.on.clipboard"
         }
@@ -45,7 +43,6 @@ struct ExpandedView: View {
     @ObservedObject var pomodoro: PomodoroModule
     @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
-    @ObservedObject var notes: NotesModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
 
@@ -57,7 +54,6 @@ struct ExpandedView: View {
             case .focus: return pomodoro.enabled
             case .prayer: return prayer.enabled
             case .shelf: return shelf.enabled
-            case .notes: return notes.enabled
             case .mirror: return mirror.enabled
             case .clipboard: return clipboard.enabled
             }
@@ -87,8 +83,6 @@ struct ExpandedView: View {
                 PrayerPage(prayer: prayer)
             case .shelf:
                 ShelfPage(shelf: shelf)
-            case .notes:
-                NotesPage(notes: notes)
             case .mirror:
                 MirrorPage(mirror: mirror)
             case .clipboard:

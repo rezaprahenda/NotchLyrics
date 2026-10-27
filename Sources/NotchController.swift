@@ -148,9 +148,7 @@ final class NotchViewModel: ObservableObject {
 /// Panel transparan di atas menu bar. Tidak pernah jadi key window,
 /// jadi tidak mencuri fokus keyboard dari app lain.
 final class NotchPanel: NSPanel {
-    /// Hanya boleh menerima ketikan saat halaman Catatan terbuka.
-    var allowsKey = false
-    override var canBecomeKey: Bool { allowsKey }
+    override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }
 
@@ -168,7 +166,6 @@ final class NotchController {
     private let prayer: PrayerModule
     private let shelf: ShelfModule
     private let device: DeviceModule
-    private let notes: NotesModule
     private let mirror: MirrorModule
     private let clipboard: ClipboardModule
     /// changeCount papan seret saat tombol mouse ditekan; berubah = sedang menyeret sesuatu.
@@ -195,7 +192,7 @@ final class NotchController {
     private var pausedByPomodoro = false
 
     init(player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule, prayer: PrayerModule,
-         shelf: ShelfModule, device: DeviceModule, notes: NotesModule, mirror: MirrorModule,
+         shelf: ShelfModule, device: DeviceModule, mirror: MirrorModule,
          clipboard: ClipboardModule) {
         self.player = player
         self.lyrics = lyrics
@@ -203,7 +200,6 @@ final class NotchController {
         self.prayer = prayer
         self.shelf = shelf
         self.device = device
-        self.notes = notes
         self.mirror = mirror
         self.clipboard = clipboard
 
@@ -224,7 +220,7 @@ final class NotchController {
         panel.ignoresMouseEvents = true
 
         let root = NotchRootView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer, shelf: shelf,
-                                 notes: notes, mirror: mirror, clipboard: clipboard)
+                                 mirror: mirror, clipboard: clipboard)
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
@@ -279,21 +275,6 @@ final class NotchController {
             .sink { [weak self] track in self?.trackChanged(track) }
 
         startCoordinator()
-
-        // Halaman Catatan: panel boleh menerima ketikan; selain itu tidak pernah mencuri fokus.
-        vm.$isExpanded.combineLatest(vm.$expandedPage)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] expanded, page in
-                guard let self else { return }
-                let typing = expanded && page == .notes
-                self.panel.allowsKey = typing
-                if typing {
-                    self.panel.makeKey()
-                } else if self.panel.isKeyWindow {
-                    self.panel.resignKey()
-                }
-            }
-            .store(in: &ownerCancellables)
 
         vm.$displayPreference
             .dropFirst()

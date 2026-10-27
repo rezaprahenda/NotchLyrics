@@ -3,50 +3,6 @@ import SwiftUI
 import AVFoundation
 import Combine
 
-// MARK: - Catatan cepat
-
-/// Satu catatan tempel, tersimpan otomatis.
-final class NotesModule: ObservableObject {
-    @Published var enabled: Bool = Defaults.bool("notes.enabled", true) {
-        didSet { UserDefaults.standard.set(enabled, forKey: "notes.enabled") }
-    }
-    @Published var text: String = UserDefaults.standard.string(forKey: "notes.text") ?? "" {
-        didSet { scheduleSave() }
-    }
-    private var saveWork: DispatchWorkItem?
-
-    private func scheduleSave() {
-        saveWork?.cancel()
-        let value = text
-        let work = DispatchWorkItem { UserDefaults.standard.set(value, forKey: "notes.text") }
-        saveWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
-    }
-}
-
-struct NotesPage: View {
-    @ObservedObject var notes: NotesModule
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $notes.text)
-                .font(.system(size: 13))
-                .scrollContentBackground(.hidden)
-                .padding(8)
-            if notes.text.isEmpty {
-                Text(L("Tulis sesuatu… tersimpan otomatis.", "Write something… saved automatically."))
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 8)
-                    .allowsHitTesting(false)
-            }
-        }
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.08)))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
 // MARK: - Kamera cermin
 
 final class MirrorModule: ObservableObject {

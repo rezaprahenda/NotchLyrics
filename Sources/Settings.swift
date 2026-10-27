@@ -8,11 +8,11 @@ final class SettingsWindowController {
     private var window: NSWindow?
 
     func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule,
-              prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule, notes: NotesModule,
+              prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule,
               mirror: MirrorModule, clipboard: ClipboardModule, lastfm: LastFMModule) {
         if window == nil {
             let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
-                                    shelf: shelf, device: device, notes: notes, mirror: mirror,
+                                    shelf: shelf, device: device, mirror: mirror,
                                     clipboard: clipboard, lastfm: lastfm)
             let host = NSHostingController(rootView: view)
             let w = NSWindow(contentViewController: host)
@@ -46,7 +46,6 @@ struct SettingsView: View {
     @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
     @ObservedObject var device: DeviceModule
-    @ObservedObject var notes: NotesModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
     @ObservedObject var lastfm: LastFMModule
@@ -54,7 +53,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettings(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
-                            shelf: shelf, device: device, notes: notes, mirror: mirror, clipboard: clipboard)
+                            shelf: shelf, device: device, mirror: mirror, clipboard: clipboard)
                 .tabItem { Label(L("Umum", "General"), systemImage: "gearshape") }
             MusicSettings(vm: vm, lyrics: lyrics, lastfm: lastfm)
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
@@ -77,7 +76,6 @@ struct GeneralSettings: View {
     @ObservedObject var prayer: PrayerModule
     @ObservedObject var shelf: ShelfModule
     @ObservedObject var device: DeviceModule
-    @ObservedObject var notes: NotesModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
     @State private var language = AppLanguage.current
@@ -116,7 +114,6 @@ struct GeneralSettings: View {
                 Toggle(L("Jadwal salat & adzan (minta izin lokasi, atau pilih kota)",
                          "Prayer times & adhan (asks for location, or choose a city)"), isOn: $prayer.enabled)
                 Toggle(L("Rak file (seret file ke notch)", "File shelf (drag files onto the notch)"), isOn: $shelf.enabled)
-                Toggle(L("Catatan cepat", "Quick note"), isOn: $notes.enabled)
                 Toggle(L("Kamera cermin (kamera hanya menyala saat halamannya dibuka)",
                          "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
                 Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",

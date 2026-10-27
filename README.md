@@ -30,7 +30,7 @@
 - **Prayer times & adhan** (Indonesian Ministry of Religious Affairs method), automatic location
   or 23 cities, Ramadan mode with Imsak and an iftar countdown; silent while your mic is in use
 - **File shelf**: drag files onto the notch, drag them out later, or AirDrop them
-- **Quick note**, **camera mirror** and **clipboard history** (optional)
+- **Camera mirror** and **clipboard history** (optional)
 - **Charger, low battery and Bluetooth headphone** banners
 
 **Stays out of the way**

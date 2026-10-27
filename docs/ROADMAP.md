@@ -103,7 +103,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 | Rak file | jumlah file | — | — | daftar file, AirDrop | — | 2.0 |
 | Baterai & AirPods | — | — | ⚡ %, AirPods % | — | Bluetooth (AirPods) | 2.0 |
 | Pengingat minum / berdiri | — | — | "Waktunya minum" | bagian dari halaman Fokus | — | 2.0 |
-| Catatan cepat | — | — | — | satu catatan tempel | — | 2.x |
+| ~~Catatan cepat~~ | dihapus: catatan diurus app **notecu** | | | | | |
 | Kamera cermin | — | — | — | pratinjau kamera depan | Kamera (saat dibuka saja) | 2.x |
 | Last.fm | — | — | — | status scrobble | Login Last.fm | 2.x |
 | Salin/bagikan lirik | — | — | — | klik kanan baris | — | 2.x |
@@ -156,7 +156,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 3. **2.0 popocu** (branch `dev`, CI hijau, menunggu tes): nama & ikon baru, ekspresi menu bar, migrasi,
    tes otomatis, koordinator prioritas & antrian peek, jendela Pengaturan, tab panel penuh,
    Pomodoro (+ pengingat minum/berdiri), Salat & adzan (+ mode Ramadan), Rak file, peek baterai &
-   headphone, Catatan cepat, Kamera cermin, riwayat clipboard, salin/bagikan lirik, Last.fm,
+   headphone, Kamera cermin, riwayat clipboard, salin/bagikan lirik, Last.fm,
    mode Focus, Reduce Motion, pilihan layar.
 4. **Belum**: notarisasi Apple (butuh akun Developer), update otomatis Sparkle (butuh kunci tanda
    tangan & tempat hosting appcast), Kalender (ditunda sampai dibutuhkan).
