@@ -34,8 +34,7 @@ struct NotesPage: View {
                 .scrollContentBackground(.hidden)
                 .padding(8)
             if notes.text.isEmpty {
-                Text(L("Tulis sesuatu… tersimpan otomatis.\nPunya notecu? Sambungkan di Pengaturan › Umum › notecu.",
-                       "Write something… saved automatically.\nUsing notecu? Connect it in Settings › General › notecu."))
+                Text(L("Tulis sesuatu… tersimpan otomatis.", "Write something… saved automatically."))
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.4))
                     .padding(.horizontal, 13)

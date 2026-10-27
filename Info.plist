@@ -32,22 +32,6 @@
     <string>popocu tetap diam (tanpa notifikasi ganti lagu atau baterai) saat mode Focus aktif.</string>
     <key>NSCameraUsageDescription</key>
     <string>Kamera hanya menyala selama halaman Cermin di popocu terbuka, untuk mengecek penampilan.</string>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <!-- Server notecu di rumah: alamat lokal / IP Tailscale, dan *.ts.net lewat http. -->
-        <key>NSAllowsLocalNetworking</key>
-        <true/>
-        <key>NSExceptionDomains</key>
-        <dict>
-            <key>ts.net</key>
-            <dict>
-                <key>NSIncludesSubdomains</key>
-                <true/>
-                <key>NSExceptionAllowsInsecureHTTPLoads</key>
-                <true/>
-            </dict>
-        </dict>
-    </dict>
     <key>NSAppleEventsUsageDescription</key>
     <string>popocu membaca lagu yang sedang diputar di Spotify atau Apple Music untuk menampilkan lirik dan kontrol musik.</string>
 </dict>

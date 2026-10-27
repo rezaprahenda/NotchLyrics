@@ -9,11 +9,11 @@ final class SettingsWindowController {
 
     func show(vm: NotchViewModel, player: PlayerMonitor, lyrics: LyricsStore, pomodoro: PomodoroModule,
               prayer: PrayerModule, shelf: ShelfModule, device: DeviceModule, notes: NotesModule,
-              mirror: MirrorModule, clipboard: ClipboardModule, lastfm: LastFMModule, notecu: NotecuModule) {
+              mirror: MirrorModule, clipboard: ClipboardModule, lastfm: LastFMModule) {
         if window == nil {
             let view = SettingsView(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
                                     shelf: shelf, device: device, notes: notes, mirror: mirror,
-                                    clipboard: clipboard, lastfm: lastfm, notecu: notecu)
+                                    clipboard: clipboard, lastfm: lastfm)
             let host = NSHostingController(rootView: view)
             let w = NSWindow(contentViewController: host)
             w.title = L("Pengaturan popocu", "popocu Settings")
@@ -50,13 +50,11 @@ struct SettingsView: View {
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
     @ObservedObject var lastfm: LastFMModule
-    @ObservedObject var notecu: NotecuModule
 
     var body: some View {
         TabView {
             GeneralSettings(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
-                            shelf: shelf, device: device, notes: notes, mirror: mirror, clipboard: clipboard,
-                            notecu: notecu)
+                            shelf: shelf, device: device, notes: notes, mirror: mirror, clipboard: clipboard)
                 .tabItem { Label(L("Umum", "General"), systemImage: "gearshape") }
             MusicSettings(vm: vm, lyrics: lyrics, lastfm: lastfm)
                 .tabItem { Label(L("Musik & lirik", "Music & lyrics"), systemImage: "music.note") }
@@ -82,8 +80,6 @@ struct GeneralSettings: View {
     @ObservedObject var notes: NotesModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
-    @ObservedObject var notecu: NotecuModule
-    @State private var notecuTest = ""
     @State private var language = AppLanguage.current
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var confirmClear = false
@@ -125,31 +121,6 @@ struct GeneralSettings: View {
                          "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
                 Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",
                          "Clipboard history (10 texts, never saved to disk)"), isOn: $clipboard.enabled)
-            }
-
-            Section("notecu") {
-                Text(L("Tab Catatan menampilkan tugas hari ini & catatan terbaru dari server notecu, dan bisa menulis ke sana.",
-                       "The Notes tab shows today's tasks & recent notes from your notecu server, and can write to it."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if notecu.notecuSettings != nil {
-                    Button(L("Pakai alamat & token dari app notecu", "Use the address & token from the notecu app")) {
-                        notecu.importFromNotecu()
-                        notecuTest = ""
-                    }
-                }
-                TextField(L("Alamat server (mis. http://homeserver:8787)", "Server address (e.g. http://homeserver:8787)"),
-                          text: $notecu.serverURL)
-                SecureField("Token", text: $notecu.token)
-                HStack {
-                    Text(notecuTest).font(.caption).foregroundStyle(.secondary)
-                    Spacer()
-                    Button(L("Tes koneksi", "Test connection")) {
-                        notecuTest = L("Menghubungi…", "Connecting…")
-                        notecu.testConnection { notecuTest = $0; notecu.sync() }
-                    }
-                    .disabled(notecu.serverURL.isEmpty)
-                }
             }
 
             Section(L("Notch", "Notch")) {

@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let mirror = MirrorModule()
     private let clipboard = ClipboardModule()
     private let lastfm = LastFMModule()
-    private let notecu = NotecuModule()
     private var controller: NotchController?
     private var statusItem: NSStatusItem?
     private let settingsWindow = SettingsWindowController()
@@ -46,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         lastfm.bind(to: player)
         let c = NotchController(player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
                                 shelf: shelf, device: device, notes: notes, mirror: mirror,
-                                clipboard: clipboard, notecu: notecu)
+                                clipboard: clipboard)
         controller = c
         c.show()
         player.start()
@@ -288,7 +287,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let vm = controller?.vm else { return }
         settingsWindow.show(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
                             shelf: shelf, device: device, notes: notes, mirror: mirror,
-                            clipboard: clipboard, lastfm: lastfm, notecu: notecu)
+                            clipboard: clipboard, lastfm: lastfm)
     }
 
     @objc private func quitApp() {

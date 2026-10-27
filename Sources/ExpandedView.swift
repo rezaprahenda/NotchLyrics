@@ -48,7 +48,6 @@ struct ExpandedView: View {
     @ObservedObject var notes: NotesModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
-    @ObservedObject var notecu: NotecuModule
 
     /// Hanya modul yang aktif yang punya tab.
     private var pages: [ExpandedPage] {
@@ -89,12 +88,7 @@ struct ExpandedView: View {
             case .shelf:
                 ShelfPage(shelf: shelf)
             case .notes:
-                // Tersambung ke notecu → tugas & catatan dari server notecu; kalau belum, catatan lokal.
-                if notecu.isConfigured {
-                    NotecuPage(notecu: notecu)
-                } else {
-                    NotesPage(notes: notes)
-                }
+                NotesPage(notes: notes)
             case .mirror:
                 MirrorPage(mirror: mirror)
             case .clipboard:
