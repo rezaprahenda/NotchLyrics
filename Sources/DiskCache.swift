@@ -16,7 +16,7 @@ final class DiskCache {
 
     private var store = Store()
     private let fileURL: URL?
-    private let ioQueue = DispatchQueue(label: "notchlyrics.diskcache", qos: .utility)
+    private let ioQueue = DispatchQueue(label: "popocu.diskcache", qos: .utility)
     private var saveWork: DispatchWorkItem?
 
     init() {

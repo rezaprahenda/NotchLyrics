@@ -47,18 +47,11 @@ echo "✓ Selesai: $(pwd)/$APP"
 case "${1:-}" in
   run)
     pkill -x popocu 2>/dev/null || true
-    pkill -x NotchLyrics 2>/dev/null || true # versi lama sebelum ganti nama
     open "$APP"
     ;;
   install)
     pkill -x popocu 2>/dev/null || true
-    pkill -x NotchLyrics 2>/dev/null || true
     sleep 0.5
-    # Versi lama (NotchLyrics) dipindah ke Trash, bukan dihapus, supaya bisa dikembalikan.
-    if [[ -d /Applications/NotchLyrics.app ]]; then
-      mv /Applications/NotchLyrics.app ~/.Trash/NotchLyrics-$(date +%s).app
-      echo "→ NotchLyrics lama dipindah ke Trash"
-    fi
     rm -rf /Applications/popocu.app
     cp -R "$APP" /Applications/
     echo "✓ Terpasang di /Applications/popocu.app"

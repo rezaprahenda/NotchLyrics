@@ -88,7 +88,7 @@ final class PlayerMonitor: ObservableObject {
     private var timer: Timer?
     private var artworkKey: String?
     private var isPolling = false
-    private let queue = DispatchQueue(label: "notchlyrics.osascript", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "popocu.osascript", qos: .userInitiated)
 
     /// Posisi lagu saat ini (diinterpolasi di antara polling supaya lirik mulus).
     var position: Double {

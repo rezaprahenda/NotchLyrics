@@ -74,12 +74,6 @@ cd popocu
 On first launch, allow popocu to control Spotify or Music when prompted.
 This permission is used only to read the current track and send playback commands.
 
-## Coming from NotchLyrics?
-
-popocu is the new name of NotchLyrics. `./build.sh install` moves the old app to the Trash, and your
-settings, lyric offsets, chosen lyrics and cache come along automatically. macOS will ask once more
-for permission to control Spotify or Music, and "Open at login" needs to be switched on again.
-
 ## Usage
 
 - Play a song. The notch shows the current lyric line.

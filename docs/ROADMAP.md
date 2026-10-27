@@ -1,8 +1,7 @@
 # Roadmap & Rancangan Pengalaman
 
 Dokumen ini memetakan semua fitur yang direncanakan, di mana masing-masing tampil di notch,
-dan aturan supaya fitur-fitur itu tidak saling bertabrakan. Nama app: **popocu** (*poni poni lucu*),
-sebelumnya NotchLyrics. Ikon: wajah berpipi merona yang mengintip dari balik poni; ikon menu bar
+dan aturan supaya fitur-fitur itu tidak saling bertabrakan. Nama app: **popocu** (*poni poni lucu*). Ikon: wajah berpipi merona yang mengintip dari balik poni; ikon menu bar
 berganti ekspresi (mengintip, melirik ke atas, kedip, tidur, fokus).
 
 ---
@@ -142,7 +141,6 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 
 - **CI build** di setiap push (`.github/workflows/build.yml`) ✅
 - **Tes otomatis** untuk logika inti: parsing LRC, pencarian baris, aturan prioritas notch, jadwal salat (dicocokkan dengan jadwal resmi Kemenag beberapa kota).
-- **Migrasi ganti nama**: salin pengaturan (`UserDefaults`), cache lirik, offset, dan pilihan manual dari bundle ID lama ke yang baru; minta ulang izin Automation dengan penjelasan; daftarkan ulang "buka saat login".
 - **Fokus pada tema waktu**: lirik, fokus, salat lebih dulu. Catatan cepat & kamera cermin paling akhir.
 - **Menghormati konteks**: peek non-penting diam saat Focus/Jangan Ganggu aktif; suara adzan tidak berbunyi saat mikrofon dipakai; animasi disederhanakan saat Reduce Motion.
 - **Multi-layar & full screen**: aturan untuk monitor eksternal tanpa notch, mode clamshell, dan app full screen.
@@ -153,7 +151,7 @@ Musik yang di-pause lebih dari 1 menit turun ke bawah urutan nomor 4.
 
 1. **1.2** ✅ akurasi lirik, retry jaringan, hemat baterai, lokalisasi en/id, bahasa terjemahan, hapus cache.
 2. **1.3** ✅ karaoke, warna cover, sembunyi saat share screen, sisi notch menyingkir, shortcut keyboard.
-3. **2.0 popocu** (branch `dev`, CI hijau, menunggu tes): nama & ikon baru, ekspresi menu bar, migrasi,
+3. **2.0 popocu** (branch `dev`, CI hijau, menunggu tes): nama & ikon baru, ekspresi menu bar,
    tes otomatis, koordinator prioritas & antrian peek, jendela Pengaturan, tab panel penuh,
    Pomodoro (+ pengingat minum/berdiri), Salat & adzan (+ mode Ramadan), Rak file, peek baterai &
    headphone, Kamera cermin, riwayat clipboard, salin/bagikan lirik, Last.fm,

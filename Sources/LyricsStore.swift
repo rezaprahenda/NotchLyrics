@@ -219,7 +219,7 @@ final class LyricsStore: ObservableObject {
             let available = path.status == .satisfied
             DispatchQueue.main.async { self?.networkChanged(available) }
         }
-        pathMonitor.start(queue: DispatchQueue(label: "notchlyrics.network", qos: .utility))
+        pathMonitor.start(queue: DispatchQueue(label: "popocu.network", qos: .utility))
     }
 
     deinit {

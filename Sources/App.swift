@@ -30,7 +30,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     static func main() {
         let app = NSApplication.shared
-        Migration.runIfNeeded() // sebelum AppDelegate membuat objek yang membaca pengaturan
         let delegate = AppDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.accessory) // tanpa ikon di Dock
