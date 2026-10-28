@@ -9,6 +9,9 @@ extension Color {
     static let deviceAccent = Color(red: 0.20, green: 0.78, blue: 0.35)  // #34c759
     static let shelfAccent = Color(red: 0.35, green: 0.66, blue: 1.0)    // #5aa9ff
     static let reminderAccent = Color(red: 0.35, green: 0.66, blue: 1.0)
+    static let musicAccent = Color(red: 1.0, green: 0.37, blue: 0.54)     // #ff5e8a merah muda (tanpa lagu)
+    static let mirrorAccent = Color(red: 0.65, green: 0.55, blue: 0.98)   // #a78bfa ungu
+    static let clipboardAccent = Color(red: 0.96, green: 0.71, blue: 0.16) // #f5b42a kuning popocu
 }
 
 /// Cincin progres tipis (dipakai di telinga & halaman Fokus).

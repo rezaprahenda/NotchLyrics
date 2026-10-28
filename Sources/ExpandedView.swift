@@ -24,13 +24,15 @@ enum ExpandedPage: String, CaseIterable {
         }
     }
 
-    /// Warna tab aktif; nil = netral (putih).
-    var accent: Color? {
+    /// Warna tab aktif. Musik mengikuti warna cover / aplikasi pemutar.
+    func accent(music: Color) -> Color {
         switch self {
+        case .music: return music
         case .focus: return .focusAccent
         case .prayer: return .prayerAccent
-        case .shelf, .clipboard: return .shelfAccent
-        case .music, .mirror: return nil
+        case .shelf: return .shelfAccent
+        case .mirror: return .mirrorAccent
+        case .clipboard: return .clipboardAccent
         }
     }
 
@@ -80,7 +82,8 @@ struct ExpandedView: View {
                 .frame(height: max(vm.notchSize.height - 6, 0))
 
             if pages.count > 1 {
-                PageTabs(pages: pages, selection: page) { selected in
+                PageTabs(pages: pages, selection: page,
+                         musicAccent: player.track == nil ? .musicAccent : vm.accent(for: player)) { selected in
                     withAnimation(.easeInOut(duration: 0.2)) { vm.expandedPage = selected }
                 }
             }
@@ -110,6 +113,7 @@ struct ExpandedView: View {
 struct PageTabs: View {
     let pages: [ExpandedPage]
     let selection: ExpandedPage
+    let musicAccent: Color
     let select: (ExpandedPage) -> Void
 
     var body: some View {
@@ -125,16 +129,15 @@ struct PageTabs: View {
                                 .font(.system(size: 11.5, weight: .semibold))
                         }
                     }
-                    .foregroundStyle(on ? (p.accent?.lighter(0.45) ?? .white) : .white.opacity(0.6))
+                    .foregroundStyle(on ? p.accent(music: musicAccent).lighter(0.45) : .white.opacity(0.6))
                     .padding(.horizontal, on ? 11 : 9)
                     .frame(height: 24)
                     .background {
                         let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        if on, let accent = p.accent {
+                        if on {
+                            let accent = p.accent(music: musicAccent)
                             shape.fill(accent.opacity(0.2))
                                 .overlay(shape.strokeBorder(accent.opacity(0.28), lineWidth: 1))
-                        } else {
-                            shape.fill(Color.white.opacity(on ? 0.16 : 0))
                         }
                     }
                     .contentShape(Rectangle())
