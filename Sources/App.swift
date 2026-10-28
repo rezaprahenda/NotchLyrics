@@ -47,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         controller = c
         c.show()
         player.start()
+        WeatherModule.shared.locate = { [weak prayer] in prayer?.coordinate }
+        WeatherModule.shared.start()
         setupStatusItem()
         // Shortcut ikut menyala / mati dari Pengaturan.
         c.vm.$shortcutsEnabled

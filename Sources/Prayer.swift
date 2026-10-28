@@ -177,6 +177,9 @@ final class PrayerModule: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
 
+    /// Koordinat yang dipakai (juga untuk cuaca).
+    var coordinate: (lat: Double, lon: Double)? { place.map { ($0.lat, $0.lon) } }
+
     /// Arah kiblat dari lokasi yang dipakai (derajat dari utara).
     var qibla: Double? {
         place.map { PrayerCalc.qibla(latitude: $0.lat, longitude: $0.lon) }

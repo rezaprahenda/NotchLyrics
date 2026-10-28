@@ -110,6 +110,7 @@ struct GeneralSettings: View {
     @ObservedObject var device: DeviceModule
     @ObservedObject var mirror: MirrorModule
     @ObservedObject var clipboard: ClipboardModule
+    @ObservedObject private var weather = WeatherModule.shared
     @State private var language = AppLanguage.current
     @State private var loginStatus = SMAppService.mainApp.status
     @State private var confirmClear = false
@@ -150,6 +151,9 @@ struct GeneralSettings: View {
                          "Camera mirror (camera runs only while its page is open)"), isOn: $mirror.enabled)
                 Toggle(L("Riwayat clipboard (10 teks, tidak disimpan ke disk)",
                          "Clipboard history (10 texts, never saved to disk)"), isOn: $clipboard.enabled)
+                Toggle(L("Cuaca di samping jam (lokasi sama dengan Salat, data Open-Meteo)",
+                         "Weather next to the clock (same location as Prayer, data from Open-Meteo)"),
+                       isOn: $weather.enabled)
             }
 
             Section(L("Notch", "Notch")) {

@@ -173,6 +173,7 @@ struct PageTabs: View {
 /// Baris di samping notch: logo + sapaan di kiri, jam di kanan.
 struct PanelHeader: View {
     let notchWidth: CGFloat
+    @ObservedObject private var weather = WeatherModule.shared
 
     var body: some View {
         TimelineView(.everyMinute) { ctx in
@@ -184,6 +185,19 @@ struct PanelHeader: View {
                 Text(Self.greeting(at: ctx.date))
                     .lineLimit(1)
                 Spacer(minLength: notchWidth + 16)
+                if weather.enabled, let w = weather.current {
+                    HStack(spacing: 4) {
+                        Image(systemName: w.symbol)
+                            .symbolRenderingMode(.multicolor)
+                            .font(.system(size: 11))
+                        Text(w.temperatureText)
+                            .monospacedDigit()
+                    }
+                    .help(weatherHelp(w))
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(w.summary), \(w.temperatureText)")
+                    Text("·").foregroundStyle(.white.opacity(0.35))
+                }
                 Text(ctx.date, format: .dateTime.hour().minute())
                     .monospacedDigit()
                     .lineLimit(1)
@@ -191,6 +205,17 @@ struct PanelHeader: View {
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(.white.opacity(0.75))
         }
+        .onAppear { weather.refreshIfStale() }
+    }
+
+    /// "Berawan · hujan mulai ±16.00 · 3 jam: 27° 26° 26°"
+    private func weatherHelp(_ w: WeatherNow) -> String {
+        let fmt: (Date) -> String = { $0.formatted(.dateTime.hour().minute()) }
+        var parts = [w.summary]
+        if let hint = WeatherCore.rainHint(w, format: fmt) { parts.append(hint) }
+        let next = w.nextHours.prefix(3).map { "\(fmt($0.hour)) \(WeatherCore.degrees($0.temperature))" }
+        if !next.isEmpty { parts.append(next.joined(separator: ", ")) }
+        return parts.joined(separator: " · ")
     }
 
     static let firstName: String = {
