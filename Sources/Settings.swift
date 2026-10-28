@@ -51,6 +51,15 @@ struct SettingsView: View {
     @ObservedObject var lastfm: LastFMModule
 
     var body: some View {
+        VStack(spacing: 0) {
+            tabs
+            Divider()
+            AboutFooter()
+        }
+        .frame(width: 540, height: 556)
+    }
+
+    private var tabs: some View {
         TabView {
             GeneralSettings(vm: vm, player: player, lyrics: lyrics, pomodoro: pomodoro, prayer: prayer,
                             shelf: shelf, device: device, mirror: mirror, clipboard: clipboard)
@@ -62,7 +71,30 @@ struct SettingsView: View {
             PrayerSettings(prayer: prayer)
                 .tabItem { Label(L("Salat", "Prayer"), systemImage: "moon.stars") }
         }
-        .frame(width: 540, height: 520)
+    }
+}
+
+/// Baris "tentang" di bawah Pengaturan, sama gayanya dengan keluarga -cu lain.
+struct AboutFooter: View {
+    private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+    private let profile = URL(string: "https://github.com/rezaprahenda")!
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 14, height: 14)
+            Text("popocu").fontWeight(.semibold)
+            Text("v\(version)").foregroundStyle(.secondary)
+            Text("pop in, cu later.").italic().foregroundStyle(.secondary)
+            Spacer()
+            Text("made by").foregroundStyle(.secondary)
+            Link("@rezaprahenda", destination: profile)
+                .help("github.com/rezaprahenda")
+        }
+        .font(.caption)
+        .padding(.horizontal, 16)
+        .frame(height: 36)
     }
 }
 
