@@ -86,7 +86,7 @@ struct AboutFooter: View {
                 .frame(width: 14, height: 14)
             Text("popocu").fontWeight(.semibold)
             Text("v\(version)").foregroundStyle(.secondary)
-            Text("pop in, cu later.").italic().foregroundStyle(.secondary)
+            Text("pop-a-cu!").italic().foregroundStyle(.secondary)
             Spacer()
             Text("made by").foregroundStyle(.secondary)
             Link("@rezaprahenda", destination: profile)
