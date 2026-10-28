@@ -59,6 +59,8 @@ struct NotchRootView: View {
         let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
         let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
         let shape = NotchShape(radius: radius, leftCut: leftCut, rightCut: rightCut)
+        // Panel penuh & peek lebar memakai latar bergradasi; telinga tetap hitam pekat.
+        let deep = mode == .expanded || (mode == .peek && vm.activePeek?.compact != true)
 
         // Saat kursor mendekati baris lirik (tembus klik), latar di bawah menu bar ikut memudar,
         // bukan hanya teksnya, supaya area di bawahnya terlihat jelas dan siap diklik.
@@ -66,11 +68,11 @@ struct NotchRootView: View {
 
         ZStack(alignment: .top) {
             shape
-                .fill(mode == .expanded
+                .fill(deep
                       ? AnyShapeStyle(PanelBackground.gradient(notchHeight: vm.notchSize.height, totalHeight: size.height))
                       : AnyShapeStyle(Color.black))
                 .overlay {
-                    if mode == .expanded {
+                    if deep {
                         // Garis terang tipis hanya di tepi bawah, supaya bentuk panel terbaca di wallpaper gelap.
                         shape.stroke(LinearGradient(stops: [
                             .init(color: .clear, location: 0),

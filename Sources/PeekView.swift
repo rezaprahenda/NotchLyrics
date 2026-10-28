@@ -22,7 +22,10 @@ struct PeekView: View {
         HStack(spacing: 0) {
             Group {
                 if let level = peek.level {
-                    BatteryGlyph(level: level, charging: peek.symbol == "bolt")
+                    let charging = peek.symbol == "bolt"
+                    BatteryGlyph(level: level, charging: charging)
+                        .softGlow(BatteryGlyph.color(level: level, charging: charging), radius: 4,
+                                  enabled: charging || level <= 0.2)
                 } else {
                     Image(systemName: peek.symbol.isEmpty ? symbol(for: peek) : peek.symbol)
                         .font(.system(size: 12, weight: .semibold))
@@ -61,7 +64,8 @@ struct PeekView: View {
 
     @ViewBuilder private var trackRow: some View {
         HStack(spacing: 10) {
-            ArtworkView(image: player.artwork, size: 34, corner: 7)
+            ArtworkView(image: player.artwork, size: 36, corner: 8)
+                .softGlow(vm.accent(for: player), radius: 6)
             VStack(alignment: .leading, spacing: 1) {
                 Text(player.track?.title ?? vm.activePeek?.title ?? "")
                     .font(.system(size: 13, weight: .semibold))
@@ -81,9 +85,12 @@ struct PeekView: View {
     private func eventRow(_ peek: PeekEvent) -> some View {
         HStack(spacing: 12) {
             Image(systemName: peek.symbol.isEmpty ? symbol(for: peek) : peek.symbol)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(tint(for: peek))
-                .frame(width: 24)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint(for: peek).lighter(0.3))
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(tint(for: peek).opacity(0.2)))
+                .overlay(Circle().strokeBorder(tint(for: peek).opacity(0.3), lineWidth: 1))
+                .softGlow(tint(for: peek), radius: 6)
             VStack(alignment: .leading, spacing: 1) {
                 Text(peek.title)
                     .font(.system(size: 13, weight: .semibold))

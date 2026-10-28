@@ -267,7 +267,10 @@ struct MusicPage: View {
 
                 HStack(spacing: 14) {
                     ProgressBar(player: player, duration: track.duration, tint: accent)
-                    VolumeControl(player: player)
+                    HStack(spacing: 4) {
+                        AudioOutputButton()
+                        VolumeControl(player: player)
+                    }
                 }
             } else {
                 EmptyStateView(permissionDenied: player.permissionDenied, error: player.lastError)

@@ -84,12 +84,16 @@ extension Color {
 struct PanelBackground {
     static func gradient(notchHeight: CGFloat, totalHeight: CGFloat) -> LinearGradient {
         let solid = totalHeight > 0 ? min(max(notchHeight / totalHeight + 0.08, 0), 0.6) : 0.25
-        return LinearGradient(stops: [
-            .init(color: .black, location: 0),
-            .init(color: .black, location: solid),
-            .init(color: Color(red: 0.055, green: 0.055, blue: 0.063), location: 0.62),
-            .init(color: .panelBottom, location: 1),
-        ], startPoint: .top, endPoint: .bottom)
+        // Naik pelan (ease-in) supaya tidak terlihat garis di tempat gradasi mulai.
+        let steps = 8
+        var stops: [Gradient.Stop] = [.init(color: .black, location: 0), .init(color: .black, location: solid)]
+        for i in 1...steps {
+            let t = Double(i) / Double(steps)
+            let eased = t * t * (3 - 2 * t) // smoothstep
+            let v = 0.09 * eased, b = 0.10 * eased
+            stops.append(.init(color: Color(red: v, green: v, blue: b), location: solid + (1 - solid) * t))
+        }
+        return LinearGradient(stops: stops, startPoint: .top, endPoint: .bottom)
     }
 }
 
