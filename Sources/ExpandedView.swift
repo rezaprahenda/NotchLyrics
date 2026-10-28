@@ -177,39 +177,57 @@ struct PanelHeader: View {
 
     var body: some View {
         TimelineView(.everyMinute) { ctx in
-            HStack(spacing: 6) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 16, height: 16)
-                Text(Self.greeting(at: ctx.date))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                // Cuaca menyambung sapaan: "Malam, Reza · ☁ 27°". Kalau sempit, nama yang dipotong duluan.
-                if weather.enabled, let w = weather.current {
-                    Text("·").foregroundStyle(.white.opacity(0.35))
-                    HStack(spacing: 4) {
-                        Image(systemName: w.symbol)
-                            .symbolRenderingMode(.multicolor)
-                            .font(.system(size: 11))
-                        Text(w.temperatureText)
-                            .monospacedDigit()
-                    }
-                    .fixedSize()
-                    .layoutPriority(1)
-                    .help(weatherHelp(w))
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("\(w.summary), \(w.temperatureText)")
+            GeometryReader { g in
+                // Tiap sisi hanya boleh memakai ruang di kiri/kanan notch fisik, supaya tidak tertutup notch.
+                let side = max((g.size.width - notchWidth) / 2 - 10, 0)
+                HStack(spacing: 0) {
+                    leftSide(at: ctx.date, width: side)
+                        .frame(width: side, alignment: .leading)
+                    Spacer(minLength: 0)
+                    Text(ctx.date, format: .dateTime.hour().minute())
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .frame(width: side, alignment: .trailing)
                 }
-                Spacer(minLength: notchWidth + 16)
-                Text(ctx.date, format: .dateTime.hour().minute())
-                    .monospacedDigit()
-                    .lineLimit(1)
+                .frame(maxHeight: .infinity)
             }
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(.white.opacity(0.75))
         }
         .onAppear { weather.refreshIfStale() }
+    }
+
+    /// Logo + sapaan + cuaca. Kalau tidak muat, nama dilepas dulu, lalu sapaannya; cuaca dipertahankan.
+    @ViewBuilder private func leftSide(at date: Date, width: CGFloat) -> some View {
+        let w = weather.enabled ? weather.current : nil
+        let weatherWidth: CGFloat = w == nil ? 0 : 52
+        let full = Self.greeting(at: date)
+        let short = Self.greeting(at: date, withName: false)
+        let fits: (String) -> Bool = { 22 + CGFloat($0.count) * 6.6 + weatherWidth <= width }
+        let text: String? = fits(full) ? full : (fits(short) ? short : nil)
+        HStack(spacing: 6) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
+            if let text {
+                Text(text).lineLimit(1)
+            }
+            if let w {
+                if text != nil { Text("·").foregroundStyle(.white.opacity(0.35)) }
+                HStack(spacing: 4) {
+                    Image(systemName: w.symbol)
+                        .symbolRenderingMode(.multicolor)
+                        .font(.system(size: 11))
+                    Text(w.temperatureText)
+                        .monospacedDigit()
+                }
+                .fixedSize()
+                .help(weatherHelp(w))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(w.summary), \(w.temperatureText)")
+            }
+        }
     }
 
     /// "Berawan · hujan mulai ±16.00 · 3 jam: 27° 26° 26°"
@@ -226,7 +244,7 @@ struct PanelHeader: View {
         NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
     }()
 
-    static func greeting(at date: Date) -> String {
+    static func greeting(at date: Date, withName: Bool = true) -> String {
         let hour = Calendar.current.component(.hour, from: date)
         let part: String
         switch hour {
@@ -235,7 +253,7 @@ struct PanelHeader: View {
         case 15..<18: part = L("Sore", "Afternoon")
         default: part = L("Malam", "Evening")
         }
-        return firstName.isEmpty ? part : "\(part), \(firstName)"
+        return firstName.isEmpty || !withName ? part : "\(part), \(firstName)"
     }
 }
 
