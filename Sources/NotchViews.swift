@@ -66,7 +66,19 @@ struct NotchRootView: View {
 
         ZStack(alignment: .top) {
             shape
-                .fill(Color.black)
+                .fill(mode == .expanded
+                      ? AnyShapeStyle(PanelBackground.gradient(notchHeight: vm.notchSize.height, totalHeight: size.height))
+                      : AnyShapeStyle(Color.black))
+                .overlay {
+                    if mode == .expanded {
+                        // Garis terang tipis hanya di tepi bawah, supaya bentuk panel terbaca di wallpaper gelap.
+                        shape.stroke(LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .clear, location: 0.7),
+                            .init(color: .white.opacity(0.09), location: 1),
+                        ], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    }
+                }
                 .mask(alignment: .top) {
                     // Gradasi halus dari pekat (menu bar) ke transparan (baris lirik), tanpa garis potong.
                     VStack(spacing: 0) {

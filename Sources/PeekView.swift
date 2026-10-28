@@ -152,7 +152,23 @@ struct PeekButton: View {
                 .foregroundStyle(filled ? Color.black.opacity(0.85) : .white)
                 .padding(.horizontal, 12)
                 .frame(height: 26)
-                .background(Capsule().fill(filled ? tint : Color.white.opacity(0.14)))
+                .background {
+                    if filled {
+                        Capsule()
+                            .fill(LinearGradient(colors: [tint.lighter(0.22), tint],
+                                                 startPoint: .top, endPoint: .bottom))
+                            .overlay(Capsule().strokeBorder(
+                                LinearGradient(colors: [.white.opacity(0.35), .clear],
+                                               startPoint: .top, endPoint: .center), lineWidth: 1))
+                            .softGlow(tint, radius: 5)
+                    } else {
+                        Capsule()
+                            .fill(Color.white.opacity(0.13))
+                            .overlay(Capsule().strokeBorder(
+                                LinearGradient(colors: [.white.opacity(0.10), .clear],
+                                               startPoint: .top, endPoint: .center), lineWidth: 1))
+                    }
+                }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

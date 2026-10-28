@@ -38,6 +38,9 @@ final class PomodoroModule: ObservableObject {
     @Published private(set) var cycleFocusDone = 0
     @Published private(set) var todaySessions = 0
     @Published private(set) var todayFocusMinutes = 0
+    /// Menit fokus 7 hari terakhir (terlama → hari ini) dan hari beruntun, untuk grafik di halaman Fokus.
+    @Published private(set) var weekMinutes: [Int] = Array(repeating: 0, count: 7)
+    @Published private(set) var streakDays = 0
 
     @Published var enabled: Bool = Defaults.bool("pomodoro.enabled", true) {
         didSet {
@@ -71,8 +74,13 @@ final class PomodoroModule: ObservableObject {
     private var reminderTimers: [Timer] = []
     private static let statsKey = "pomodoro.stats"
 
+    private var dayObserver: NSObjectProtocol?
+
     init() {
         loadToday()
+        // Lewat tengah malam: angka "hari ini" dan grafik mingguan ikut bergeser.
+        dayObserver = NotificationCenter.default.addObserver(forName: .NSCalendarDayChanged, object: nil,
+                                                             queue: .main) { [weak self] _ in self?.loadToday() }
     }
 
     // MARK: - Status
@@ -225,6 +233,16 @@ final class PomodoroModule: ObservableObject {
         let today = stats[PomodoroCore.dayKey(Date())] ?? [0, 0]
         todaySessions = today.first ?? 0
         todayFocusMinutes = today.count > 1 ? today[1] : 0
+        refreshWeek(stats)
+    }
+
+    private func refreshWeek(_ stats: [String: [Int]]) {
+        let now = Date()
+        weekMinutes = PomodoroCore.lastDays(7, endingAt: now).map { day in
+            let v = stats[PomodoroCore.dayKey(day)] ?? []
+            return v.count > 1 ? v[1] : 0
+        }
+        streakDays = PomodoroCore.streak(stats, today: now)
     }
 
     private func record(minutes: Int) {
@@ -242,6 +260,7 @@ final class PomodoroModule: ObservableObject {
         UserDefaults.standard.set(stats, forKey: Self.statsKey)
         todaySessions = today[0]
         todayFocusMinutes = today[1]
+        refreshWeek(stats)
     }
 
     private static func loadSettings() -> PomodoroSettings {

@@ -41,4 +41,18 @@ func prayerTests() {
         let comps = cal.dateComponents([.hour, .minute], from: s[.dhuhr]!)
         expectEqual((comps.hour ?? 0) * 60 + (comps.minute ?? 0), m[.dhuhr] ?? 0, "schedule() = minutes() dalam Date")
     }
+
+    suite("PrayerCalc kiblat & posisi") {
+        let jkt = PrayerCalc.qibla(latitude: -6.2088, longitude: 106.8456)
+        expect(near(jkt, 295.1, 0.5), "kiblat Jakarta ≈ 295°: \(jkt)")
+        let london = PrayerCalc.qibla(latitude: 51.5074, longitude: -0.1278)
+        expect(near(london, 119.0, 0.5), "kiblat London ≈ 119°: \(london)")
+
+        let t0 = Date(timeIntervalSince1970: 0)
+        let times = (0..<5).map { t0.addingTimeInterval(Double($0) * 3600) }
+        expect(near(PrayerCalc.position(of: t0.addingTimeInterval(-60), in: times), 0), "sebelum Subuh → 0")
+        expect(near(PrayerCalc.position(of: t0.addingTimeInterval(5400), in: times), 1.5), "di tengah waktu 2 dan 3")
+        expect(near(PrayerCalc.position(of: t0.addingTimeInterval(99_999), in: times), 4), "setelah Isya → 4")
+        expect(near(PrayerCalc.position(of: t0, in: []), 0), "deret kosong aman")
+    }
 }

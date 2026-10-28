@@ -24,6 +24,16 @@ enum ExpandedPage: String, CaseIterable {
         }
     }
 
+    /// Warna tab aktif; nil = netral (putih).
+    var accent: Color? {
+        switch self {
+        case .focus: return .focusAccent
+        case .prayer: return .prayerAccent
+        case .shelf, .clipboard: return .shelfAccent
+        case .music, .mirror: return nil
+        }
+    }
+
     var symbol: String {
         switch self {
         case .music: return "music.note"
@@ -66,7 +76,8 @@ struct ExpandedView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Color.clear.frame(height: max(vm.notchSize.height - 6, 0))
+            PanelHeader(notchWidth: vm.notchSize.width)
+                .frame(height: max(vm.notchSize.height - 6, 0))
 
             if pages.count > 1 {
                 PageTabs(pages: pages, selection: page) { selected in
@@ -114,11 +125,18 @@ struct PageTabs: View {
                                 .font(.system(size: 11.5, weight: .semibold))
                         }
                     }
-                    .foregroundStyle(.white.opacity(on ? 1 : 0.6))
+                    .foregroundStyle(on ? (p.accent?.lighter(0.45) ?? .white) : .white.opacity(0.6))
                     .padding(.horizontal, on ? 11 : 9)
                     .frame(height: 24)
-                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.white.opacity(on ? 0.16 : 0)))
+                    .background {
+                        let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        if on, let accent = p.accent {
+                            shape.fill(accent.opacity(0.2))
+                                .overlay(shape.strokeBorder(accent.opacity(0.28), lineWidth: 1))
+                        } else {
+                            shape.fill(Color.white.opacity(on ? 0.16 : 0))
+                        }
+                    }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -140,8 +158,52 @@ struct PageTabs: View {
             .accessibilityLabel(L("Tambah modul", "Add modules"))
         }
         .padding(3)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.white.opacity(0.08)))
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+            shape.fill(Color.white.opacity(0.07))
+                .overlay(shape.strokeBorder(Color.white.opacity(0.05), lineWidth: 1))
+        }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// Baris di samping notch: logo + sapaan di kiri, jam di kanan.
+struct PanelHeader: View {
+    let notchWidth: CGFloat
+
+    var body: some View {
+        TimelineView(.everyMinute) { ctx in
+            HStack(spacing: 6) {
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 16, height: 16)
+                Text(Self.greeting(at: ctx.date))
+                    .lineLimit(1)
+                Spacer(minLength: notchWidth + 16)
+                Text(ctx.date, format: .dateTime.hour().minute())
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.75))
+        }
+    }
+
+    static let firstName: String = {
+        NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+    }()
+
+    static func greeting(at date: Date) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        let part: String
+        switch hour {
+        case 4..<11: part = L("Pagi", "Morning")
+        case 11..<15: part = L("Siang", "Afternoon")
+        case 15..<18: part = L("Sore", "Afternoon")
+        default: part = L("Malam", "Evening")
+        }
+        return firstName.isEmpty ? part : "\(part), \(firstName)"
     }
 }
 
@@ -309,11 +371,9 @@ struct ShelfChip: View {
 
 struct PrayerPage: View {
     @ObservedObject var prayer: PrayerModule
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    private var rows: [Prayer] {
-        let base: [Prayer] = [.fajr, .sunrise, .dhuhr, .asr, .maghrib, .isha]
-        return prayer.isRamadan ? [.imsak] + base : base
-    }
+    private let obligatory: [Prayer] = [.fajr, .dhuhr, .asr, .maghrib, .isha]
 
     var body: some View {
         if prayer.today.isEmpty {
@@ -337,79 +397,143 @@ struct PrayerPage: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 nextCard
-                    .frame(width: 196)
+                    .frame(width: 158)
                     .frame(maxHeight: .infinity)
-                timetable
+                arcCard
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    /// Kartu "berikutnya": nama waktu, jam besar, hitung mundur, progres sejak waktu sebelumnya.
+    /// Kartu "berikutnya": nama waktu, jam besar bercahaya, hitung mundur, tempat & kiblat.
     @ViewBuilder private var nextCard: some View {
         let now = prayer.now
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(L("BERIKUTNYA", "NEXT"))
                 .font(.system(size: 10, weight: .bold))
                 .tracking(0.8)
-                .foregroundStyle(Color.prayerAccent.opacity(0.9))
+                .foregroundStyle(Color.prayerAccent.lighter(0.4))
             if let next = prayer.next(after: now) {
                 Text(next.prayer == .maghrib && prayer.isRamadan ? L("Maghrib · berbuka", "Maghrib · iftar") : next.prayer.title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
                 Text(prayer.timeText(next.time))
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(Color.prayerAccent)
+                    .foregroundStyle(Color.prayerAccent.lighter(0.35))
+                    .softGlow(.prayerAccent, radius: 8)
                 Text(L("\(countdown(to: next.time)) lagi", "in \(countdown(to: next.time))"))
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
-                Spacer(minLength: 6)
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.12))
-                        Capsule().fill(Color.prayerAccent)
-                            .frame(width: g.size.width * progress(until: next.time, now: now))
-                    }
-                }
-                .frame(height: 4)
             }
-            Spacer(minLength: 6)
-            Text(prayer.placeName.isEmpty ? prayer.hijriDate : "\(prayer.placeName) · \(prayer.hijriDate)")
+            Spacer(minLength: 4)
+            Text(prayer.placeName.isEmpty ? prayer.hijriDate : prayer.placeName)
                 .font(.system(size: 10.5))
                 .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(2)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.prayerAccent.opacity(0.12)))
-    }
-
-    /// Daftar waktu, dibagi rata dari atas ke bawah; yang sudah lewat diredupkan.
-    private var timetable: some View {
-        let now = prayer.now
-        let next = prayer.next(after: now)?.prayer
-        return VStack(spacing: 2) {
-            ForEach(rows, id: \.self) { p in
-                let isNext = p == next
-                let passed = (prayer.today[p] ?? .distantFuture) < now && !isNext
-                HStack {
-                    Text(p.title)
-                    Spacer()
-                    Text(prayer.timeText(prayer.today[p]))
-                        .monospacedDigit()
-                }
-                .font(.system(size: 13, weight: isNext ? .semibold : .regular))
-                .foregroundStyle(isNext ? Color.prayerAccent
-                                 : .white.opacity(passed ? 0.35 : (p.isObligatory ? 0.9 : 0.55)))
-                .padding(.horizontal, 12)
-                .frame(maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(isNext ? Color.prayerAccent.opacity(0.16) : .clear))
+                .lineLimit(1)
+            if let q = prayer.qibla {
+                Text(L("Kiblat \(Int(q.rounded()))°", "Qibla \(Int(q.rounded()))°"))
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.55))
             }
         }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .surfaceCard(tint: .prayerAccent)
+    }
+
+    /// Lengkung waktu salat wajib + pilihan suara & pengingat.
+    private var arcCard: some View {
+        let now = prayer.now
+        let times = obligatory.compactMap { prayer.today[$0] }
+        let position = times.count == obligatory.count ? PrayerCalc.position(of: now, in: times) : 0
+        let next = prayer.next(after: now)
+        let nextIndex = next.flatMap { n in obligatory.firstIndex(of: n.prayer) }
+
+        return VStack(spacing: 4) {
+            HStack {
+                Text(extraLine)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .lineLimit(1)
+                Spacer()
+            }
+            PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency)
+                .frame(maxHeight: .infinity)
+            HStack(spacing: 0) {
+                ForEach(Array(obligatory.enumerated()), id: \.offset) { i, p in
+                    let isNext = i == nextIndex
+                    let passed = Double(i) < position && !isNext
+                    let time = (isNext && next?.time != nil) ? next!.time : prayer.today[p]
+                    VStack(spacing: 0) {
+                        Text(p.title)
+                            .font(.system(size: 10, weight: isNext ? .semibold : .regular))
+                        Text(prayer.timeText(time))
+                            .font(.system(size: 10.5, weight: .semibold))
+                            .monospacedDigit()
+                    }
+                    .lineLimit(1)
+                    .foregroundStyle(isNext ? Color.prayerAccent.lighter(0.4) : .white.opacity(passed ? 0.4 : 0.8))
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            HStack(spacing: 8) {
+                soundPicker
+                Spacer(minLength: 0)
+                MiniSwitch(label: L("Pengingat", "Reminders"), isOn: prayer.preAlerts, tint: .prayerAccent) {
+                    prayer.preAlerts.toggle()
+                }
+                .help(L("Peek 15 & 5 menit sebelum waktu salat", "Peek 15 & 5 minutes before each prayer"))
+            }
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .surfaceCard()
+    }
+
+    /// "Imsak 04.00 · Terbit 05.24" (Imsak hanya saat Ramadan).
+    private var extraLine: String {
+        var parts: [String] = []
+        if prayer.isRamadan, let imsak = prayer.today[.imsak] {
+            parts.append("\(Prayer.imsak.title) \(prayer.timeText(imsak))")
+        }
+        if let sunrise = prayer.today[.sunrise] {
+            parts.append("\(Prayer.sunrise.title) \(prayer.timeText(sunrise))")
+        }
+        parts.append(prayer.hijriDate)
+        return parts.joined(separator: " · ")
+    }
+
+    /// Adzan (file sendiri, jika ada) / Nada (bunyi sistem) / Senyap.
+    private var soundPicker: some View {
+        var options: [(AdhanSound, String)] = []
+        if !prayer.adhanFilePath.isEmpty || prayer.adhanSound == .file {
+            options.append((.file, L("Adzan", "Adhan")))
+        }
+        options.append((.system, L("Nada", "Tone")))
+        options.append((.off, L("Senyap", "Silent")))
+        return HStack(spacing: 0) {
+            ForEach(options, id: \.0) { option, title in
+                let on = prayer.adhanSound == option
+                Button { prayer.adhanSound = option } label: {
+                    Text(title)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(.white.opacity(on ? 1 : 0.55))
+                        .padding(.horizontal, 9)
+                        .frame(height: 20)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.white.opacity(on ? 0.15 : 0)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(2)
+        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.07)))
     }
 
     private func countdown(to date: Date) -> String {
@@ -417,13 +541,84 @@ struct PrayerPage: View {
         let h = minutes / 60, m = minutes % 60
         return h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) menit", "\(m) min")
     }
+}
 
-    /// Progres dari waktu salat sebelumnya (atau tengah malam) menuju waktu berikutnya.
-    private func progress(until next: Date, now: Date) -> Double {
-        let start = prayer.last(before: now)?.time ?? Calendar.current.startOfDay(for: now)
-        let total = next.timeIntervalSince(start)
-        guard total > 0 else { return 0 }
-        return min(max(now.timeIntervalSince(start) / total, 0), 1)
+/// Lengkung putus-putus seperti lintasan matahari; titik per waktu salat, titik bercahaya = sekarang.
+struct PrayerArc: View {
+    let count: Int
+    /// Indeks pecahan posisi sekarang (0…count−1).
+    let position: Double
+    var glow = true
+
+    var body: some View {
+        Canvas { ctx, size in
+            guard count > 1 else { return }
+            let w = size.width, h = size.height
+            let base = h - 5, amp = max(h - 14, 4)
+            func y(atX x: CGFloat) -> CGFloat {
+                let t = Double(x / w) * 2 - 1
+                return base - amp * CGFloat(1 - t * t)
+            }
+            func point(_ index: Double) -> CGPoint {
+                let x = CGFloat((index + 0.5) / Double(count)) * w
+                return CGPoint(x: x, y: y(atX: x))
+            }
+            var curve = Path()
+            let steps = 60
+            for i in 0...steps {
+                let x = 4 + (w - 8) * CGFloat(i) / CGFloat(steps)
+                let p = CGPoint(x: x, y: y(atX: x))
+                if i == 0 { curve.move(to: p) } else { curve.addLine(to: p) }
+            }
+            let dash = StrokeStyle(lineWidth: 2.2, lineCap: .round, dash: [3, 5])
+            ctx.stroke(curve, with: .color(.white.opacity(0.18)), style: dash)
+
+            let current = point(position)
+            ctx.drawLayer { layer in
+                layer.clip(to: Path(CGRect(x: 0, y: 0, width: current.x, height: h)))
+                layer.stroke(curve, with: .color(Color.prayerAccent.opacity(0.9)), style: dash)
+            }
+            for i in 0..<count {
+                let p = point(Double(i))
+                let passed = Double(i) <= position
+                ctx.fill(Path(ellipseIn: CGRect(x: p.x - 3.5, y: p.y - 3.5, width: 7, height: 7)),
+                         with: .color(passed ? .prayerAccent : .white.opacity(0.3)))
+            }
+            ctx.drawLayer { layer in
+                if glow { layer.addFilter(.shadow(color: Color.prayerAccent.opacity(0.9), radius: 6)) }
+                layer.fill(Path(ellipseIn: CGRect(x: current.x - 6.5, y: current.y - 6.5, width: 13, height: 13)),
+                           with: .color(Color.prayerAccent.lighter(0.4)))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Sakelar kecil bergaya iOS, sebagai tombol (panel notch tidak menerima fokus keyboard).
+struct MiniSwitch: View {
+    let label: String
+    let isOn: Bool
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.75))
+                ZStack(alignment: isOn ? .trailing : .leading) {
+                    Capsule().fill(isOn ? tint : Color.white.opacity(0.2))
+                    Circle().fill(.white).padding(2)
+                }
+                .frame(width: 26, height: 15)
+                .animation(.easeInOut(duration: 0.15), value: isOn)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityValue(isOn ? L("aktif", "on") : L("mati", "off"))
     }
 }
 
@@ -438,37 +633,40 @@ struct FocusPage: View {
     }
 
     var body: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 18) {
             TimelineView(.animation(minimumInterval: 1, paused: pomodoro.isPaused || pomodoro.phase == .idle)) { ctx in
                 ZStack {
-                    ProgressRing(progress: pomodoro.phase == .idle ? 0 : pomodoro.progress(at: ctx.date),
-                                 color: accent, lineWidth: 9)
-                    VStack(spacing: 2) {
+                    GlowRing(progress: pomodoro.phase == .idle ? 0 : pomodoro.progress(at: ctx.date),
+                             color: accent, lineWidth: 10)
+                    VStack(spacing: 0) {
                         Text(clockText(at: ctx.date))
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .font(.system(size: 36, weight: .heavy, design: .rounded))
                             .monospacedDigit()
-                        Text(phaseLabel)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(accent)
+                        Text("\(phaseLabel) · \(sessionNumber(totalSessions))/\(totalSessions)")
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundStyle(accent.lighter(0.4))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .frame(maxWidth: 124)
                     }
                 }
-                .frame(width: 164, height: 164)
+                .frame(width: 156, height: 156)
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                sessionDots
+            VStack(alignment: .leading, spacing: 10) {
                 controls
                 if pomodoro.phase == .idle && pomodoro.waitingFor == nil {
                     presets
                 }
-                Spacer(minLength: 0)
-                stats
+                statsCard
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private var totalSessions: Int { max(pomodoro.settings.sessionsBeforeLongBreak, 1) }
 
     private func clockText(at date: Date) -> String {
         if pomodoro.phase != .idle { return PomodoroCore.clock(pomodoro.remaining(at: date)) }
@@ -486,21 +684,6 @@ struct FocusPage: View {
                 return next.isBreak ? L("Siap istirahat", "Ready for a break") : L("Siap fokus", "Ready to focus")
             }
             return L("Siap mulai", "Ready")
-        }
-    }
-
-    private var sessionDots: some View {
-        let total = max(pomodoro.settings.sessionsBeforeLongBreak, 1)
-        return HStack(spacing: 5) {
-            ForEach(0..<total, id: \.self) { i in
-                Capsule()
-                    .fill(i < pomodoro.cycleFocusDone ? Color.focusAccent : Color.white.opacity(0.18))
-                    .frame(width: 18, height: 5)
-            }
-            Text(L("sesi \(sessionNumber(total)) dari \(total)", "session \(sessionNumber(total)) of \(total)"))
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(.white.opacity(0.65))
-                .padding(.leading, 4)
         }
     }
 
@@ -541,30 +724,78 @@ struct FocusPage: View {
         }
     }
 
-    /// Dua kartu statistik hari ini.
-    private var stats: some View {
-        let h = pomodoro.todayFocusMinutes / 60
-        let m = pomodoro.todayFocusMinutes % 60
-        let time = h > 0 ? L("\(h) j \(m) m", "\(h)h \(m)m") : L("\(m) mnt", "\(m) min")
-        return HStack(spacing: 8) {
-            statTile(value: "\(pomodoro.todaySessions)", label: L("sesi hari ini", "sessions today"))
-            statTile(value: time, label: L("waktu fokus", "focus time"))
+    /// Kartu statistik: menit hari ini, hari beruntun, dan batang 7 hari.
+    private var statsCard: some View {
+        HStack(alignment: .bottom, spacing: 10) {
+            VStack(alignment: .leading, spacing: 7) {
+                statLine(minutesText(pomodoro.todayFocusMinutes), label: L("hari ini", "today"))
+                statLine(Text("\(pomodoro.streakDays)") + Text(L(" hari", pomodoro.streakDays == 1 ? " day" : " days")).font(.system(size: 12, weight: .bold, design: .rounded)),
+                         label: L("beruntun", "streak"))
+            }
+            Spacer(minLength: 0)
+            WeekBars(minutes: pomodoro.weekMinutes, accent: accent)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .surfaceCard()
     }
 
-    private func statTile(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+    private func minutesText(_ total: Int) -> Text {
+        let unit = Font.system(size: 12, weight: .bold, design: .rounded)
+        let h = total / 60, m = total % 60
+        if h == 0 { return Text("\(m)") + Text(L(" mnt", " min")).font(unit) }
+        return Text("\(h)") + Text(L(" j ", "h ")).font(unit) + Text("\(m)") + Text(L(" m", "m")).font(unit)
+    }
+
+    private func statLine(_ value: Text, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            value
+                .font(.system(size: 19, weight: .heavy, design: .rounded))
                 .monospacedDigit()
             Text(label)
                 .font(.system(size: 10.5))
                 .foregroundStyle(.white.opacity(0.55))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.07)))
+    }
+}
+
+/// Batang menit fokus 7 hari; hari ini menyala dengan warna aksen.
+struct WeekBars: View {
+    let minutes: [Int]
+    let accent: Color
+    var maxHeight: CGFloat = 40
+
+    var body: some View {
+        let top = max(minutes.max() ?? 0, 25)
+        let days = PomodoroCore.lastDays(minutes.count, endingAt: Date())
+        HStack(alignment: .bottom, spacing: 6) {
+            ForEach(Array(minutes.enumerated()), id: \.offset) { i, value in
+                let today = i == minutes.count - 1
+                VStack(spacing: 4) {
+                    Capsule()
+                        .fill(today
+                              ? AnyShapeStyle(LinearGradient(colors: [accent.lighter(0.4), accent], startPoint: .top, endPoint: .bottom))
+                              : AnyShapeStyle(Color.white.opacity(0.18)))
+                        .frame(width: 8, height: max(4, maxHeight * CGFloat(value) / CGFloat(top)))
+                        .softGlow(accent, radius: 5, enabled: today && value > 0)
+                    Text(i < days.count ? Self.initial(days[i]) : "")
+                        .font(.system(size: 9.5, weight: today ? .bold : .medium))
+                        .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(0.45))
+                }
+                .help(L("\(value) menit", "\(value) min"))
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L("Menit fokus 7 hari terakhir", "Focus minutes, last 7 days"))
+        .accessibilityValue(minutes.map(String.init).joined(separator: ", "))
+    }
+
+    static func initial(_ date: Date) -> String {
+        let wd = Calendar.current.component(.weekday, from: date) // 1 = Minggu
+        let id = ["M", "S", "S", "R", "K", "J", "S"]
+        let en = ["S", "M", "T", "W", "T", "F", "S"]
+        return L(id[wd - 1], en[wd - 1])
     }
 }
 

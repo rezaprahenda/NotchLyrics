@@ -177,6 +177,11 @@ final class PrayerModule: NSObject, ObservableObject, CLLocationManagerDelegate 
         }
     }
 
+    /// Arah kiblat dari lokasi yang dipakai (derajat dari utara).
+    var qibla: Double? {
+        place.map { PrayerCalc.qibla(latitude: $0.lat, longitude: $0.lon) }
+    }
+
     func refreshLocation() {
         guard enabled, locationMode == .automatic else { return }
         switch locationManager.authorizationStatus {

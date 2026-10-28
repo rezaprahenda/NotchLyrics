@@ -110,6 +110,29 @@ enum PrayerCalc {
         return String(format: "%02d.%02d", m / 60, m % 60)
     }
 
+    /// Arah kiblat (derajat dari utara searah jarum jam) dari suatu titik ke Ka'bah.
+    static func qibla(latitude: Double, longitude: Double) -> Double {
+        let kaabaLat = rad(21.4225), kaabaLon = 39.8262
+        let phi = rad(latitude)
+        let dLon = rad(kaabaLon - longitude)
+        let theta = atan2(sin(dLon), cos(phi) * tan(kaabaLat) - sin(phi) * cos(dLon))
+        return fixAngle(deg(theta))
+    }
+
+    /// Posisi "sekarang" pada deret waktu berurutan, sebagai indeks pecahan 0…n−1
+    /// (mis. 2.5 = di tengah antara waktu ke-3 dan ke-4). Sebelum yang pertama → 0, setelah yang terakhir → n−1.
+    static func position(of now: Date, in times: [Date]) -> Double {
+        guard let first = times.first, let last = times.last else { return 0 }
+        if now <= first { return 0 }
+        if now >= last { return Double(times.count - 1) }
+        for i in 0..<(times.count - 1) where now < times[i + 1] {
+            let span = times[i + 1].timeIntervalSince(times[i])
+            let f = span > 0 ? now.timeIntervalSince(times[i]) / span : 0
+            return Double(i) + min(max(f, 0), 1)
+        }
+        return Double(times.count - 1)
+    }
+
     // MARK: - Astronomi
 
     private static func rad(_ d: Double) -> Double { d * .pi / 180 }

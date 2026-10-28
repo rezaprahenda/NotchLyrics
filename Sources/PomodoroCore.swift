@@ -51,4 +51,28 @@ enum PomodoroCore {
         let c = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
+
+    /// Tanggal n hari terakhir, dari yang terlama sampai `date` (hari ini).
+    static func lastDays(_ n: Int, endingAt date: Date, calendar: Calendar = .current) -> [Date] {
+        guard n > 0 else { return [] }
+        return (0..<n).reversed().compactMap { calendar.date(byAdding: .day, value: -$0, to: date) }
+    }
+
+    /// Hari beruntun yang punya minimal satu sesi fokus. Hari ini yang belum ada sesinya
+    /// tidak memutus rentetan (dihitung dari kemarin).
+    static func streak(_ stats: [String: [Int]], today: Date, calendar: Calendar = .current) -> Int {
+        func done(_ d: Date) -> Bool { (stats[dayKey(d, calendar: calendar)]?.first ?? 0) > 0 }
+        var day = today
+        if !done(day) {
+            guard let y = calendar.date(byAdding: .day, value: -1, to: day) else { return 0 }
+            day = y
+        }
+        var count = 0
+        while done(day), count < 3650 {
+            count += 1
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = prev
+        }
+        return count
+    }
 }

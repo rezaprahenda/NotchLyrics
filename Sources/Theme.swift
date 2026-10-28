@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Satu warna aksen tetap per modul (lihat kanvas desain).
 extension Color {
@@ -60,5 +61,106 @@ struct BatteryGlyph: View {
         }
         .accessibilityElement()
         .accessibilityLabel(charging ? L("Mengisi daya", "Charging") : L("Baterai", "Battery"))
+    }
+}
+
+// MARK: - Kedalaman visual (lihat papan "Kedalaman visual" di kanvas desain)
+
+extension Color {
+    /// Ujung bawah gradasi panel penuh; bagian atas tetap hitam supaya menyatu dengan notch fisik.
+    static let panelBottom = Color(red: 0.09, green: 0.09, blue: 0.10)  // #17171a
+
+    /// Versi lebih terang dari warna ini (untuk ujung gradasi & teks aksen di atas latar gelap).
+    func lighter(_ amount: CGFloat = 0.4) -> Color {
+        let ns = NSColor(self).usingColorSpace(.sRGB) ?? NSColor(self)
+        return Color(nsColor: ns.blended(withFraction: amount, of: .white) ?? ns)
+    }
+}
+
+/// Latar panel penuh: hitam pekat di area notch, sedikit terang ke bawah.
+struct PanelBackground {
+    static func gradient(notchHeight: CGFloat, totalHeight: CGFloat) -> LinearGradient {
+        let solid = totalHeight > 0 ? min(max(notchHeight / totalHeight + 0.08, 0), 0.6) : 0.25
+        return LinearGradient(stops: [
+            .init(color: .black, location: 0),
+            .init(color: .black, location: solid),
+            .init(color: Color(red: 0.055, green: 0.055, blue: 0.063), location: 0.62),
+            .init(color: .panelBottom, location: 1),
+        ], startPoint: .top, endPoint: .bottom)
+    }
+}
+
+/// Kartu permukaan: sedikit lebih terang dari latar, dengan kilau 1 px di tepi atas.
+/// `tint` memberi cahaya warna dari pojok kiri atas (dipakai kartu "berikutnya").
+struct SurfaceCard: ViewModifier {
+    var tint: Color? = nil
+    var radius: CGFloat = 14
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        content.background {
+            ZStack {
+                if reduceTransparency {
+                    shape.fill(tint?.opacity(0.18) ?? Color(white: 0.11))
+                } else {
+                    shape.fill(LinearGradient(colors: [.white.opacity(0.075), .white.opacity(0.035)],
+                                              startPoint: .top, endPoint: .bottom))
+                    if let tint {
+                        shape.fill(RadialGradient(colors: [tint.opacity(0.28), tint.opacity(0.04)],
+                                                  center: .topLeading, startRadius: 0, endRadius: 190))
+                    }
+                    shape.strokeBorder(LinearGradient(colors: [.white.opacity(0.10), .white.opacity(0.03)],
+                                                      startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    func surfaceCard(tint: Color? = nil, radius: CGFloat = 14) -> some View {
+        modifier(SurfaceCard(tint: tint, radius: radius))
+    }
+
+    /// Cahaya halus berwarna; mati saat Reduce Transparency.
+    func softGlow(_ color: Color, radius: CGFloat = 6, enabled: Bool = true) -> some View {
+        modifier(SoftGlow(color: color, radius: radius, enabled: enabled))
+    }
+}
+
+struct SoftGlow: ViewModifier {
+    let color: Color
+    let radius: CGFloat
+    let enabled: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        content.shadow(color: (enabled && !reduceTransparency) ? color.opacity(0.55) : .clear, radius: radius)
+    }
+}
+
+/// Cincin progres tebal bergradasi dengan glow (halaman Fokus).
+struct GlowRing: View {
+    let progress: Double
+    let color: Color
+    var lineWidth: CGFloat = 10
+
+    var body: some View {
+        let p = min(max(progress, 0), 1)
+        ZStack {
+            Circle()
+                .fill(RadialGradient(colors: [color.opacity(0.16), .clear], center: .init(x: 0.5, y: 0.35),
+                                     startRadius: 0, endRadius: 70))
+                .padding(lineWidth)
+            Circle().stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
+            Circle()
+                .trim(from: 0, to: p)
+                .stroke(LinearGradient(colors: [color.lighter(0.5), color, color.opacity(0.9)],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .softGlow(color, radius: 7, enabled: p > 0)
+        }
     }
 }
