@@ -6,3 +6,8 @@ build/
 
 # Arsip unduhan
 *.zip
+
+# Sisa build Swift / Xcode
+.swiftpm/
+*.dSYM/
+xcuserdata/
