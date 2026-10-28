@@ -69,7 +69,7 @@ struct ControlsView: View {
                 }
             }
             ControlButton(symbol: "backward.fill", size: 14) { player.previous() }
-            ControlButton(symbol: player.isPlaying ? "pause.fill" : "play.fill", size: 20) { player.playPause() }
+            PlayPauseButton(isPlaying: player.isPlaying) { player.playPause() }
             ControlButton(symbol: "forward.fill", size: 14) { player.next() }
             if let mode = player.repeatMode {
                 ControlButton(symbol: mode == .one ? "repeat.1" : "repeat", size: 12,
@@ -78,6 +78,31 @@ struct ControlsView: View {
                 }
             }
         }
+    }
+}
+
+/// Tombol utama: lingkaran putih penuh dengan ikon gelap, supaya paling menonjol.
+struct PlayPauseButton: View {
+    let isPlaying: Bool
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.black.opacity(0.85))
+                .offset(x: isPlaying ? 0 : 1)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.white.opacity(hover ? 1 : 0.94)))
+                .overlay(Circle().strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5))
+                .scaleEffect(hover ? 1.05 : 1)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .animation(.easeOut(duration: 0.12), value: hover)
+        .accessibilityLabel(isPlaying ? L("Jeda", "Pause") : L("Putar", "Play"))
     }
 }
 
@@ -107,6 +132,7 @@ struct ControlButton: View {
 struct ProgressBar: View {
     @ObservedObject var player: PlayerMonitor
     let duration: Double
+    var tint: Color = .white
     @State private var dragFraction: Double?
     @State private var hovering = false
 
@@ -122,8 +148,16 @@ struct ProgressBar: View {
                         Capsule().fill(Color.white.opacity(0.2))
                             .frame(height: active ? 6 : 4)
                         Capsule()
-                            .fill(Color.white.opacity(active ? 1 : 0.85))
+                            .fill(LinearGradient(colors: [tint.lighter(0.55), tint.lighter(0.15)],
+                                                 startPoint: .leading, endPoint: .trailing))
                             .frame(width: g.size.width * fraction, height: active ? 6 : 4)
+                            .softGlow(tint, radius: 4, enabled: fraction > 0)
+                        // Titik posisi sekarang.
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: active ? 11 : 7, height: active ? 11 : 7)
+                            .softGlow(tint, radius: 5)
+                            .offset(x: max(g.size.width * fraction - (active ? 5.5 : 3.5), 0))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -144,7 +178,7 @@ struct ProgressBar: View {
                 .animation(.easeOut(duration: 0.15), value: active)
                 Text(format(duration)).monospacedDigit()
             }
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
             .foregroundStyle(.white.opacity(0.6))
         }
         .frame(height: 16)

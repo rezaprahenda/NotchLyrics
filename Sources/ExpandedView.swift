@@ -225,11 +225,15 @@ struct MusicPage: View {
         }
     }
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
+        let accent = vm.accent(for: player)
         VStack(spacing: 12) {
             if let track = player.track {
                 HStack(spacing: 12) {
-                    ArtworkView(image: player.artwork, size: 50, corner: 10)
+                    ArtworkView(image: player.artwork, size: 58, corner: 12)
+                        .shadow(color: reduceTransparency ? .clear : accent.opacity(0.45), radius: 10, y: 4)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(track.title)
                             .font(.system(size: 14, weight: .semibold))
@@ -239,9 +243,12 @@ struct MusicPage: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         HStack(spacing: 6) {
-                            Text(track.source.displayName)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(vm.accent(for: player).opacity(0.9))
+                            HStack(spacing: 4) {
+                                Circle().fill(accent).frame(width: 6, height: 6)
+                                Text(track.source.displayName)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
                             SleepIndicator(player: player)
                         }
                     }
@@ -259,11 +266,22 @@ struct MusicPage: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 HStack(spacing: 14) {
-                    ProgressBar(player: player, duration: track.duration)
+                    ProgressBar(player: player, duration: track.duration, tint: accent)
                     VolumeControl(player: player)
                 }
             } else {
                 EmptyStateView(permissionDenied: player.permissionDenied, error: player.lastError)
+            }
+        }
+        .background {
+            // Cahaya warna cover dari pojok kiri bawah (jauh dari notch), melebar sampai tepi panel.
+            if player.track != nil && !reduceTransparency {
+                RadialGradient(colors: [accent.opacity(0.24), accent.opacity(0.06), .clear],
+                               center: .bottomLeading, startRadius: 0, endRadius: 300)
+                    .padding(.horizontal, -20)
+                    .padding(.bottom, -14)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.6), value: player.artworkColor)
             }
         }
     }
