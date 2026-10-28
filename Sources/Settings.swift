@@ -77,7 +77,7 @@ struct SettingsView: View {
 /// Baris "tentang" di bawah Pengaturan, sama gayanya dengan keluarga -cu lain.
 struct AboutFooter: View {
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-    private let profile = URL(string: "https://github.com/rezaprahenda")!
+    private let profile = URL(string: "https://instagram.com/rezaprahenda")!
 
     var body: some View {
         HStack(spacing: 6) {
@@ -90,7 +90,7 @@ struct AboutFooter: View {
             Spacer()
             Text("made by").foregroundStyle(.secondary)
             Link("@rezaprahenda", destination: profile)
-                .help("github.com/rezaprahenda")
+                .help("instagram.com/rezaprahenda")
         }
         .font(.caption)
         .padding(.horizontal, 16)
