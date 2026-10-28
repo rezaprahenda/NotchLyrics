@@ -184,8 +184,10 @@ struct PanelHeader: View {
                     .frame(width: 16, height: 16)
                 Text(Self.greeting(at: ctx.date))
                     .lineLimit(1)
-                Spacer(minLength: notchWidth + 16)
+                    .truncationMode(.tail)
+                // Cuaca menyambung sapaan: "Malam, Reza · ☁ 27°". Kalau sempit, nama yang dipotong duluan.
                 if weather.enabled, let w = weather.current {
+                    Text("·").foregroundStyle(.white.opacity(0.35))
                     HStack(spacing: 4) {
                         Image(systemName: w.symbol)
                             .symbolRenderingMode(.multicolor)
@@ -193,11 +195,13 @@ struct PanelHeader: View {
                         Text(w.temperatureText)
                             .monospacedDigit()
                     }
+                    .fixedSize()
+                    .layoutPriority(1)
                     .help(weatherHelp(w))
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(w.summary), \(w.temperatureText)")
-                    Text("·").foregroundStyle(.white.opacity(0.35))
                 }
+                Spacer(minLength: notchWidth + 16)
                 Text(ctx.date, format: .dateTime.hour().minute())
                     .monospacedDigit()
                     .lineLimit(1)
