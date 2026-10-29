@@ -16,16 +16,15 @@ enum Prayer: String, CaseIterable, Codable {
         }
     }
 
-    /// Nama waktu salat memakai ejaan Indonesia di semua bahasa (seperti di masjid & aplikasi lokal).
     var title: String {
         switch self {
         case .imsak: return "Imsak"
-        case .fajr: return "Subuh"
+        case .fajr: return L("Subuh", "Fajr")
         case .sunrise: return L("Terbit", "Sunrise")
-        case .dhuhr: return "Dzuhur"
-        case .asr: return "Ashar"
+        case .dhuhr: return L("Dzuhur", "Dhuhr")
+        case .asr: return L("Ashar", "Asr")
         case .maghrib: return "Maghrib"
-        case .isha: return "Isya"
+        case .isha: return L("Isya", "Isha")
         }
     }
 }
