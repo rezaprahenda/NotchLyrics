@@ -263,6 +263,7 @@ struct MusicPage: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var player: PlayerMonitor
     @ObservedObject var lyrics: LyricsStore
+    @Environment(\.panelStyle) private var style
 
     private var showsLyricsToolbar: Bool {
         if lyrics.isPickerOpen { return false }
@@ -280,7 +281,7 @@ struct MusicPage: View {
             if let track = player.track {
                 HStack(spacing: 12) {
                     ArtworkView(image: player.artwork, size: 58, corner: 12)
-                        .shadow(color: reduceTransparency ? .clear : accent.opacity(0.45), radius: 10, y: 4)
+                        .shadow(color: .black.opacity(style == .plain ? 0 : 0.45), radius: 8, y: 4)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(track.title)
                             .font(.system(size: 14, weight: .semibold))
@@ -325,7 +326,7 @@ struct MusicPage: View {
         }
         .background {
             // Cahaya warna cover dari pojok kiri bawah (jauh dari notch), melebar sampai tepi panel.
-            if player.track != nil && !reduceTransparency {
+            if player.track != nil && !reduceTransparency && style != .plain {
                 RadialGradient(colors: [accent.opacity(0.24), accent.opacity(0.06), .clear],
                                center: .bottomLeading, startRadius: 0, endRadius: 300)
                     .padding(.horizontal, -20)
@@ -442,6 +443,7 @@ struct ShelfChip: View {
 
 struct PrayerPage: View {
     @ObservedObject var prayer: PrayerModule
+    @Environment(\.panelStyle) private var style
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let obligatory: [Prayer] = [.fajr, .dhuhr, .asr, .maghrib, .isha]
@@ -494,7 +496,6 @@ struct PrayerPage: View {
                     .font(.system(size: 34, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Color.prayerAccent.lighter(0.35))
-                    .softGlow(.prayerAccent, radius: 8)
                 Text(L("\(countdown(to: next.time)) lagi", "in \(countdown(to: next.time))"))
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
@@ -531,7 +532,7 @@ struct PrayerPage: View {
                     .lineLimit(1)
                 Spacer()
             }
-            PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency)
+            PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency && style != .plain)
                 .frame(maxHeight: .infinity)
             HStack(spacing: 0) {
                 ForEach(Array(obligatory.enumerated()), id: \.offset) { i, p in
@@ -849,7 +850,6 @@ struct WeekBars: View {
                               ? AnyShapeStyle(LinearGradient(colors: [accent.lighter(0.4), accent], startPoint: .top, endPoint: .bottom))
                               : AnyShapeStyle(Color.white.opacity(0.18)))
                         .frame(width: 8, height: max(4, maxHeight * CGFloat(value) / CGFloat(top)))
-                        .softGlow(accent, radius: 5, enabled: today && value > 0)
                     Text(i < days.count ? Self.initial(days[i]) : "")
                         .font(.system(size: 9.5, weight: today ? .bold : .medium))
                         .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(0.45))

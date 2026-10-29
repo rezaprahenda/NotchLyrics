@@ -61,6 +61,10 @@ final class NotchViewModel: ObservableObject {
     @Published var hiddenEar: EarSide?
 
     /// Warna equalizer & aksen mengikuti cover album (kalau tidak: warna app).
+    @Published var panelStyle: PanelStyle =
+        PanelStyle(rawValue: UserDefaults.standard.string(forKey: "panelStyle") ?? "") ?? .vivid {
+        didSet { UserDefaults.standard.set(panelStyle.rawValue, forKey: "panelStyle") }
+    }
     @Published var accentFromArtwork: Bool = NotchViewModel.storedBool("accentFromArtwork", false) {
         didSet { UserDefaults.standard.set(accentFromArtwork, forKey: "accentFromArtwork") }
     }

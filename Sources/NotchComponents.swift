@@ -151,7 +151,6 @@ struct ProgressBar: View {
                             .fill(LinearGradient(colors: [tint.lighter(0.55), tint.lighter(0.15)],
                                                  startPoint: .leading, endPoint: .trailing))
                             .frame(width: g.size.width * fraction, height: active ? 6 : 4)
-                            .softGlow(tint, radius: 4, enabled: fraction > 0)
                         // Titik posisi sekarang.
                         Circle()
                             .fill(Color.white)

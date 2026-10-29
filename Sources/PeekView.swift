@@ -65,7 +65,6 @@ struct PeekView: View {
     @ViewBuilder private var trackRow: some View {
         HStack(spacing: 10) {
             ArtworkView(image: player.artwork, size: 36, corner: 8)
-                .softGlow(vm.accent(for: player), radius: 6)
             VStack(alignment: .leading, spacing: 1) {
                 Text(player.track?.title ?? vm.activePeek?.title ?? "")
                     .font(.system(size: 13, weight: .semibold))
@@ -90,7 +89,6 @@ struct PeekView: View {
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(tint(for: peek).opacity(0.2)))
                 .overlay(Circle().strokeBorder(tint(for: peek).opacity(0.3), lineWidth: 1))
-                .softGlow(tint(for: peek), radius: 6)
             VStack(alignment: .leading, spacing: 1) {
                 Text(peek.title)
                     .font(.system(size: 13, weight: .semibold))
@@ -167,7 +165,6 @@ struct PeekButton: View {
                             .overlay(Capsule().strokeBorder(
                                 LinearGradient(colors: [.white.opacity(0.35), .clear],
                                                startPoint: .top, endPoint: .center), lineWidth: 1))
-                            .softGlow(tint, radius: 5)
                     } else {
                         Capsule()
                             .fill(Color.white.opacity(0.13))

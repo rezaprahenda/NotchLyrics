@@ -103,12 +103,15 @@ struct SurfaceCard: ViewModifier {
     var tint: Color? = nil
     var radius: CGFloat = 14
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.panelStyle) private var style
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content.background {
             ZStack {
-                if reduceTransparency {
+                if style == .plain {
+                    shape.fill(tint?.opacity(0.12) ?? Color.white.opacity(0.06))
+                } else if reduceTransparency {
                     shape.fill(tint?.opacity(0.18) ?? Color(white: 0.11))
                 } else {
                     shape.fill(LinearGradient(colors: [.white.opacity(0.075), .white.opacity(0.035)],
@@ -141,9 +144,11 @@ struct SoftGlow: ViewModifier {
     let radius: CGFloat
     let enabled: Bool
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.panelStyle) private var style
 
     func body(content: Content) -> some View {
-        content.shadow(color: (enabled && !reduceTransparency) ? color.opacity(0.55) : .clear, radius: radius)
+        let on = enabled && !reduceTransparency && style != .plain
+        content.shadow(color: on ? color.opacity(0.55) : .clear, radius: radius)
     }
 }
 
@@ -168,6 +173,88 @@ struct GlowRing: View {
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .softGlow(color, radius: 7, enabled: p > 0)
+        }
+    }
+}
+
+// MARK: - Gaya panel (Pengaturan › Notch › Gaya)
+
+enum PanelStyle: String, CaseIterable {
+    /// Gradasi gelap + kartu berlapis + satu cahaya per halaman (bawaan).
+    case vivid
+    /// Bagian di bawah menu bar memakai kaca gelap buram.
+    case glass
+    /// Hitam rata tanpa cahaya.
+    case plain
+
+    var title: String {
+        switch self {
+        case .vivid: return L("Hidup", "Vivid")
+        case .glass: return L("Kaca", "Glass")
+        case .plain: return L("Polos", "Plain")
+        }
+    }
+}
+
+private struct PanelStyleKey: EnvironmentKey {
+    static let defaultValue: PanelStyle = .vivid
+}
+
+extension EnvironmentValues {
+    var panelStyle: PanelStyle {
+        get { self[PanelStyleKey.self] }
+        set { self[PanelStyleKey.self] = newValue }
+    }
+}
+
+/// Kaca buram bawaan macOS (memburamkan apa pun di belakang jendela notch).
+struct VisualEffectBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = .hudWindow
+        v.blendingMode = .behindWindow
+        v.state = .active
+        v.appearance = NSAppearance(named: .darkAqua)
+        return v
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+/// Latar notch sesuai gaya. Area setinggi notch fisik selalu hitam pekat.
+struct NotchFill: View {
+    let style: PanelStyle
+    /// Panel penuh / peek lebar (bergradasi) — selain itu telinga + baris lirik.
+    let deep: Bool
+    let notchHeight: CGFloat
+    let totalHeight: CGFloat
+
+    var body: some View {
+        switch style {
+        case .plain:
+            Color.black
+        case .vivid:
+            if deep {
+                PanelBackground.gradient(notchHeight: notchHeight, totalHeight: totalHeight)
+            } else {
+                Color.black
+            }
+        case .glass:
+            if totalHeight > notchHeight + 1 {
+                let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
+                ZStack {
+                    VisualEffectBackground()
+                    LinearGradient(stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: solid),
+                        .init(color: .black.opacity(0.9), location: solid + (1 - solid) * 0.25),
+                        .init(color: .black.opacity(0.74), location: solid + (1 - solid) * 0.6),
+                        .init(color: .black.opacity(0.66), location: 1),
+                    ], startPoint: .top, endPoint: .bottom)
+                }
+            } else {
+                Color.black
+            }
         }
     }
 }

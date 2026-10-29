@@ -157,6 +157,14 @@ struct GeneralSettings: View {
             }
 
             Section(L("Notch", "Notch")) {
+                Picker(L("Gaya", "Style"), selection: $vm.panelStyle) {
+                    ForEach(PanelStyle.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Text(L("Hidup: gradasi & cahaya halus · Kaca: bagian bawah tembus pandang buram · Polos: hitam rata",
+                       "Vivid: gradient & soft light · Glass: frosted lower part · Plain: flat black"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker(L("Tampilkan di", "Show on"), selection: $vm.displayPreference) {
                     ForEach(DisplayPreference.allCases, id: \.self) { Text($0.title).tag($0) }
                 }

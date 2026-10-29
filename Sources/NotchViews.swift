@@ -49,6 +49,7 @@ struct NotchRootView: View {
     @ObservedObject var shelf: ShelfModule
     let mirror: MirrorModule
     let clipboard: ClipboardModule
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         let mode = vm.mode()
@@ -66,13 +67,14 @@ struct NotchRootView: View {
         // bukan hanya teksnya, supaya area di bawahnya terlihat jelas dan siap diklik.
         let lowerOpacity: Double = (mode == .compact && vm.lyricLineFaded) ? 0.12 : 1
 
+        // Kaca butuh transparansi; Reduce Transparency → kembali ke Hidup.
+        let style: PanelStyle = (vm.panelStyle == .glass && reduceTransparency) ? .vivid : vm.panelStyle
+
         ZStack(alignment: .top) {
-            shape
-                .fill(deep
-                      ? AnyShapeStyle(PanelBackground.gradient(notchHeight: vm.notchSize.height, totalHeight: size.height))
-                      : AnyShapeStyle(Color.black))
+            NotchFill(style: style, deep: deep, notchHeight: vm.notchSize.height, totalHeight: size.height)
+                .clipShape(shape)
                 .overlay {
-                    if deep {
+                    if deep && style != .plain {
                         // Garis terang tipis hanya di tepi bawah, supaya bentuk panel terbaca di wallpaper gelap.
                         shape.stroke(LinearGradient(stops: [
                             .init(color: .clear, location: 0),
@@ -116,6 +118,7 @@ struct NotchRootView: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .environment(\.panelStyle, style)
         .clipShape(shape)
         .shadow(color: .black.opacity(mode == .expanded ? 0.35 : 0), radius: 12, y: 4)
         .opacity(mode == .hidden ? 0 : 1)
