@@ -70,6 +70,33 @@ struct NotchRootView: View {
         // Kaca butuh transparansi; Reduce Transparency → kembali ke Hidup.
         let style: PanelStyle = (vm.panelStyle == .glass && reduceTransparency) ? .vivid : vm.panelStyle
 
+        // Kaca hanya untuk bagian yang turun di bawah menu bar.
+        let showGlass = style == .glass && mode != .hidden && mode != .idle && size.height > vm.notchSize.height + 1
+
+        ZStack(alignment: .top) {
+            if showGlass {
+                GlassBackdrop(radius: radius, alpha: lowerOpacity < 1 ? 0 : 1)
+                    .padding(.leading, leftCut)
+                    .padding(.trailing, rightCut)
+                    .frame(width: size.width, height: size.height)
+                    .allowsHitTesting(false)
+            }
+            notchBody(mode: mode, size: size, shape: shape, deep: deep, style: style,
+                      showLine: showLine, lowerOpacity: lowerOpacity)
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: mode)
+        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: showLine)
+        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: doubleLine)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: vm.hiddenEar)
+        .frame(width: NotchViewModel.windowSize.width,
+               height: NotchViewModel.windowSize.height,
+               alignment: .top)
+        .environment(\.colorScheme, .dark)
+    }
+
+    @ViewBuilder
+    private func notchBody(mode: NotchMode, size: CGSize, shape: NotchShape, deep: Bool, style: PanelStyle,
+                           showLine: Bool, lowerOpacity: Double) -> some View {
         ZStack(alignment: .top) {
             NotchFill(style: style, deep: deep, notchHeight: vm.notchSize.height, totalHeight: size.height)
                 .clipShape(shape)
@@ -120,15 +147,8 @@ struct NotchRootView: View {
         .frame(width: size.width, height: size.height)
         .environment(\.panelStyle, style)
         .clipShape(shape)
-        .shadow(color: .black.opacity(mode == .expanded ? 0.35 : 0), radius: 12, y: 4)
+        // Bayangan di bawah kaca akan menggelapkan kacanya, jadi gaya Kaca tanpa bayangan SwiftUI.
+        .shadow(color: .black.opacity(mode == .expanded && style != .glass ? 0.35 : 0), radius: 12, y: 4)
         .opacity(mode == .hidden ? 0 : 1)
-        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: mode)
-        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: showLine)
-        .animation(.spring(response: 0.4, dampingFraction: 0.82), value: doubleLine)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: vm.hiddenEar)
-        .frame(width: NotchViewModel.windowSize.width,
-               height: NotchViewModel.windowSize.height,
-               alignment: .top)
-        .environment(\.colorScheme, .dark)
     }
 }

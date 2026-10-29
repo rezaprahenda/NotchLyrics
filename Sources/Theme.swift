@@ -208,18 +208,68 @@ extension EnvironmentValues {
 }
 
 /// Kaca buram bawaan macOS (memburamkan apa pun di belakang jendela notch).
-struct VisualEffectBackground: NSViewRepresentable {
+///
+/// Penting: lapisan kaca TIDAK boleh berada di dalam view yang diberi `.mask`, `.clipShape`
+/// atau `.shadow` SwiftUI — itu membuat macOS menggambarnya di luar layar dan kacanya
+/// berubah jadi abu-abu polos. Bentuknya diatur lewat `maskImage` milik NSVisualEffectView.
+struct GlassBackdrop: NSViewRepresentable {
+    let radius: CGFloat
+    var alpha: CGFloat = 1
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let v = NSVisualEffectView()
         v.material = .hudWindow
-        v.isEmphasized = false
         v.blendingMode = .behindWindow
         v.state = .active
+        v.isEmphasized = false
         v.appearance = NSAppearance(named: .darkAqua)
+        v.maskImage = Self.mask(radius: radius)
+        v.alphaValue = alpha
         return v
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ v: NSVisualEffectView, context: Context) {
+        if context.coordinator.radius != radius {
+            context.coordinator.radius = radius
+            v.maskImage = Self.mask(radius: radius)
+        }
+        if abs(v.alphaValue - alpha) > 0.01 {
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.2
+                v.animator().alphaValue = alpha
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(radius: radius) }
+
+    final class Coordinator {
+        var radius: CGFloat
+        init(radius: CGFloat) { self.radius = radius }
+    }
+
+    /// Gambar topeng yang bisa melar: atas lurus, dua sudut bawah membulat.
+    /// Radius sedikit dibesarkan supaya kaca tidak mengintip di luar sudut "continuous" panel.
+    static func mask(radius: CGFloat) -> NSImage {
+        let r = max(radius * 1.3, 1)
+        let side = ceil(r * 2 + 2)
+        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            NSColor.black.setFill()
+            let path = NSBezierPath()
+            path.move(to: NSPoint(x: 0, y: rect.maxY))
+            path.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+            path.line(to: NSPoint(x: rect.maxX, y: r))
+            path.appendArc(withCenter: NSPoint(x: rect.maxX - r, y: r), radius: r, startAngle: 0, endAngle: 270, clockwise: true)
+            path.line(to: NSPoint(x: r, y: 0))
+            path.appendArc(withCenter: NSPoint(x: r, y: r), radius: r, startAngle: 270, endAngle: 180, clockwise: true)
+            path.close()
+            path.fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: 1, left: r, bottom: r, right: r)
+        image.resizingMode = .stretch
+        return image
+    }
 }
 
 /// Latar notch sesuai gaya. Area setinggi notch fisik selalu hitam pekat.
@@ -244,7 +294,7 @@ struct NotchFill: View {
             if totalHeight > notchHeight + 1 {
                 let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
                 ZStack {
-                    VisualEffectBackground()
+                    // Kacanya sendiri digambar di belakang (GlassBackdrop, di NotchRootView); di sini hanya lapisan gelapnya.
                     // Cukup gelap supaya teks putih tetap terbaca di atas jendela putih,
                     // tapi warna di belakang masih tembus. Baris lirik (teks kecil) dibuat lebih gelap.
                     let mid = deep ? 0.66 : 0.76
