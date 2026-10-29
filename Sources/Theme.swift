@@ -212,6 +212,7 @@ struct VisualEffectBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let v = NSVisualEffectView()
         v.material = .hudWindow
+        v.isEmphasized = false
         v.blendingMode = .behindWindow
         v.state = .active
         v.appearance = NSAppearance(named: .darkAqua)
@@ -244,12 +245,14 @@ struct NotchFill: View {
                 let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
                 ZStack {
                     VisualEffectBackground()
+                    // Material HUD sudah gelap sendiri, jadi lapisan hitamnya tipis saja;
+                    // kalau terlalu tebal, kacanya tidak terasa (terlihat sama dengan Hidup).
                     LinearGradient(stops: [
                         .init(color: .black, location: 0),
                         .init(color: .black, location: solid),
-                        .init(color: .black.opacity(0.9), location: solid + (1 - solid) * 0.25),
-                        .init(color: .black.opacity(0.74), location: solid + (1 - solid) * 0.6),
-                        .init(color: .black.opacity(0.66), location: 1),
+                        .init(color: .black.opacity(0.62), location: solid + (1 - solid) * 0.18),
+                        .init(color: .black.opacity(0.42), location: solid + (1 - solid) * 0.5),
+                        .init(color: .black.opacity(0.32), location: 1),
                     ], startPoint: .top, endPoint: .bottom)
                 }
             } else {
