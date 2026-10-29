@@ -245,14 +245,16 @@ struct NotchFill: View {
                 let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
                 ZStack {
                     VisualEffectBackground()
-                    // Material HUD sudah gelap sendiri, jadi lapisan hitamnya tipis saja;
-                    // kalau terlalu tebal, kacanya tidak terasa (terlihat sama dengan Hidup).
+                    // Cukup gelap supaya teks putih tetap terbaca di atas jendela putih,
+                    // tapi warna di belakang masih tembus. Baris lirik (teks kecil) dibuat lebih gelap.
+                    let mid = deep ? 0.66 : 0.76
+                    let end = deep ? 0.56 : 0.70
                     LinearGradient(stops: [
                         .init(color: .black, location: 0),
                         .init(color: .black, location: solid),
-                        .init(color: .black.opacity(0.62), location: solid + (1 - solid) * 0.18),
-                        .init(color: .black.opacity(0.42), location: solid + (1 - solid) * 0.5),
-                        .init(color: .black.opacity(0.32), location: 1),
+                        .init(color: .black.opacity(deep ? 0.82 : 0.86), location: solid + (1 - solid) * 0.18),
+                        .init(color: .black.opacity(mid), location: solid + (1 - solid) * 0.5),
+                        .init(color: .black.opacity(end), location: 1),
                     ], startPoint: .top, endPoint: .bottom)
                 }
             } else {
