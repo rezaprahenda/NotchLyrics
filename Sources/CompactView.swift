@@ -94,8 +94,16 @@ struct CompactView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(Color.shelfAccent)
                 .frame(width: 20, height: 20)
+        } else if vm.earOwner == .prayerSoon {
+            // Nama waktu di kiri, sisa menit di kanan: "Dzuhur ▮notch▮ 9m". Satu telinga terlalu sempit untuk keduanya.
+            Text(prayerSoonLabel)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.prayerAccent)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: earTextWidth, alignment: .leading)
         } else if isPrayerOwner {
-            Image(systemName: vm.earOwner == .prayerNow ? "moon.stars.fill" : "moon.stars")
+            Image(systemName: "moon.stars.fill")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.prayerAccent)
                 .frame(width: 20, height: 20)
@@ -131,7 +139,8 @@ struct CompactView: View {
                 .monospacedDigit()
                 .foregroundStyle(Color.prayerAccent)
                 .lineLimit(1)
-                .fixedSize()
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: earTextWidth, alignment: .trailing)
         } else if vm.earOwner == .pomodoro {
             Group {
                 if let next = pomodoro.waitingFor {
@@ -147,14 +156,18 @@ struct CompactView: View {
             .monospacedDigit()
             .foregroundStyle(pomodoro.phase.isBreak ? Color.breakAccent : Color.focusAccent)
             .lineLimit(1)
-            .fixedSize()
+            .minimumScaleFactor(0.75)
+            .frame(maxWidth: earTextWidth, alignment: .trailing)
         } else {
             EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
                 .frame(width: 20, height: 14)
         }
     }
 
-    /// "Ashar 14m", "Buka 42m" (Ramadan), atau "Ashar" saat waktunya baru masuk.
+    /// Lebar teks yang aman di satu telinga (tidak masuk ke bawah notch fisik).
+    private var earTextWidth: CGFloat { max(vm.earWidth - 16, 30) }
+
+    /// Telinga kanan: "14m" (menjelang), atau nama waktu saat baru masuk ("Ashar").
     private var prayerText: String {
         let now = prayer.now
         if vm.earOwner == .prayerNow, let last = prayer.last(before: now) {
@@ -162,7 +175,12 @@ struct CompactView: View {
         }
         guard let next = prayer.next(after: now) else { return "" }
         let minutes = max(Int((next.time.timeIntervalSince(now) / 60).rounded(.up)), 0)
-        let label = next.prayer == .maghrib && prayer.isRamadan ? L("Buka", "Iftar") : next.prayer.title
-        return "\(label) \(minutes)m"
+        return "\(minutes)m"
+    }
+
+    /// Telinga kiri saat menjelang: "Dzuhur", atau "Buka" saat Ramadan.
+    private var prayerSoonLabel: String {
+        guard let next = prayer.next(after: prayer.now) else { return "" }
+        return next.prayer == .maghrib && prayer.isRamadan ? L("Buka", "Iftar") : next.prayer.title
     }
 }
