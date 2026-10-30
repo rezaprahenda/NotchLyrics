@@ -203,13 +203,13 @@ struct PanelHeader: View {
         let weatherWidth: CGFloat = w == nil ? 0 : 52
         let full = Self.greeting(at: date)
         let short = Self.greeting(at: date, withName: false)
-        let fits: (String) -> Bool = { 22 + CGFloat($0.count) * 6.6 + weatherWidth <= width }
+        let fits: (String) -> Bool = { 28 + CGFloat($0.count) * 6.6 + weatherWidth <= width }
         let text: String? = fits(full) ? full : (fits(short) ? short : nil)
         HStack(spacing: 6) {
-            Image(nsImage: NSApp.applicationIconImage)
+            Image(nsImage: Brand.mascot)
                 .resizable()
                 .interpolation(.high)
-                .frame(width: 16, height: 16)
+                .frame(width: 22, height: 22)
             if let text {
                 Text(text).lineLimit(1)
             }
@@ -726,6 +726,7 @@ struct MiniSwitch: View {
 
 struct FocusPage: View {
     @ObservedObject var pomodoro: PomodoroModule
+    @Environment(\.panelStyle) private var style
 
     private var accent: Color {
         let phase = pomodoro.phase == .idle ? (pomodoro.waitingFor ?? .focus) : pomodoro.phase
@@ -860,7 +861,7 @@ struct FocusPage: View {
                 .monospacedDigit()
             Text(label)
                 .font(.system(size: 10.5))
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(.white.opacity(style == .glass ? 0.72 : 0.55))
         }
     }
 }
@@ -870,6 +871,7 @@ struct WeekBars: View {
     let minutes: [Int]
     let accent: Color
     var maxHeight: CGFloat = 40
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         let top = max(minutes.max() ?? 0, 25)
@@ -885,7 +887,7 @@ struct WeekBars: View {
                         .frame(width: 9, height: max(4, maxHeight * CGFloat(value) / CGFloat(top)))
                     Text(i < days.count ? Self.initial(days[i]) : "")
                         .font(.system(size: 9.5, weight: today ? .bold : .medium))
-                        .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(0.45))
+                        .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(style == .glass ? 0.65 : 0.45))
                         .fixedSize()
                 }
                 .frame(width: 14)

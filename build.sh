@@ -24,6 +24,8 @@ xcrun swiftc \
   Sources/*.swift
 
 cp Info.plist "$APP/Contents/Info.plist"
+# Gambar karakter (tanpa kotak) untuk kepala panel & Pengaturan.
+[[ -f Resources/Mascot.png ]] && cp Resources/Mascot.png "$APP/Contents/Resources/Mascot.png"
 
 # Ikon: ubah Resources/AppIcon.png (1024px) jadi AppIcon.icns dengan alat bawaan macOS.
 if [[ -f Resources/AppIcon.png ]]; then

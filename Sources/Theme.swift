@@ -161,11 +161,13 @@ struct GlowRing: View {
     let progress: Double
     let color: Color
     var lineWidth: CGFloat = 10
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         let p = min(max(progress, 0), 1)
         ZStack {
-            Circle().stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
+            // Di atas kaca terang jalurnya perlu lebih tegas.
+            Circle().stroke(Color.white.opacity(style == .glass ? 0.18 : 0.08), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: p)
                 .stroke(LinearGradient(colors: [color.lighter(0.5), color, color.opacity(0.9)],
@@ -289,5 +291,66 @@ struct NotchFill: View {
                 Color.black
             }
         }
+    }
+}
+
+/// Aset merek popocu.
+enum Brand {
+    /// Karakter popocu tanpa kotak (Resources/Mascot.png); cadangan: ikon app.
+    static let mascot: NSImage = Bundle.main.image(forResource: "Mascot") ?? NSApp.applicationIconImage
+}
+
+/// Bayangan lembut di sekeliling panel kaca. Bagian di dalam panel dilubangi (mask even-odd),
+/// jadi bayangan tidak menggelapkan kacanya sendiri.
+final class GlassShadowView: NSView {
+    private let shadowLayer = CALayer()
+    private let maskLayer = CAShapeLayer()
+    private let pad: CGFloat = 28
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        alphaValue = 0
+        shadowLayer.shadowColor = NSColor.black.cgColor
+        shadowLayer.shadowOpacity = 0.28
+        shadowLayer.shadowRadius = 10
+        shadowLayer.shadowOffset = CGSize(width: 0, height: -4)
+        layer?.addSublayer(shadowLayer)
+        maskLayer.fillRule = .evenOdd
+        layer?.mask = maskLayer
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) tidak dipakai") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func update(panel: NSRect, radius: CGFloat) {
+        frame = panel.insetBy(dx: -pad, dy: -pad)
+        let local = NSRect(x: pad, y: pad, width: panel.width, height: panel.height)
+        let path = Self.panelPath(local, radius: radius)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shadowLayer.frame = bounds
+        shadowLayer.shadowPath = path
+        let m = CGMutablePath()
+        m.addRect(bounds)
+        m.addPath(path)
+        maskLayer.frame = bounds
+        maskLayer.path = m
+        CATransaction.commit()
+    }
+
+    /// Atas lurus, dua sudut bawah membulat (koordinat y ke atas).
+    static func panelPath(_ r: NSRect, radius: CGFloat) -> CGPath {
+        let rad = min(radius, r.width / 2, r.height / 2)
+        let p = CGMutablePath()
+        p.move(to: CGPoint(x: r.minX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY + rad))
+        p.addArc(tangent1End: CGPoint(x: r.maxX, y: r.minY), tangent2End: CGPoint(x: r.maxX - rad, y: r.minY), radius: rad)
+        p.addLine(to: CGPoint(x: r.minX + rad, y: r.minY))
+        p.addArc(tangent1End: CGPoint(x: r.minX, y: r.minY), tangent2End: CGPoint(x: r.minX, y: r.minY + rad), radius: rad)
+        p.closeSubpath()
+        return p
     }
 }

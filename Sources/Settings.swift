@@ -81,9 +81,10 @@ struct AboutFooter: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(nsImage: NSApp.applicationIconImage)
+            Image(nsImage: Brand.mascot)
                 .resizable()
-                .frame(width: 14, height: 14)
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
             Text("popocu").fontWeight(.semibold)
             Text("v\(version)").foregroundStyle(.secondary)
             Text("pop-a-cu!").italic().foregroundStyle(.secondary)

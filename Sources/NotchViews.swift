@@ -93,6 +93,14 @@ struct NotchRootView: View {
                       glassDarkness: vm.glassDarkness)
                 .clipShape(shape)
                 .overlay {
+                    if deep && style == .glass {
+                        // Kaca di atas latar putih: garis tepi gelap tipis supaya bentuk panel tetap terbaca.
+                        shape.stroke(LinearGradient(stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .clear, location: 0.45),
+                            .init(color: .black.opacity(0.22), location: 1),
+                        ], startPoint: .top, endPoint: .bottom), lineWidth: 1)
+                    }
                     if deep && style == .vivid {
                         // Garis terang tipis hanya di tepi bawah, supaya bentuk panel terbaca di wallpaper gelap.
                         shape.stroke(LinearGradient(stops: [

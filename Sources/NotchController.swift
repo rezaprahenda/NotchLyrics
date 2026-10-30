@@ -177,6 +177,8 @@ final class NotchController {
     /// Kaca untuk gaya "Kaca": NSVisualEffectView biasa di bawah SwiftUI (bukan di dalamnya),
     /// supaya macOS benar-benar bisa memburamkan isi layar di belakang jendela.
     private let glass = GlassView()
+    /// Bayangan di LUAR kaca (bagian dalamnya dilubangi supaya kaca tidak ikut gelap).
+    private let glassShadow = GlassShadowView()
     private var glassCancellables = Set<AnyCancellable>()
     private var glassRadius: CGFloat = -1
     private var glassSize: CGSize = .zero
@@ -246,6 +248,7 @@ final class NotchController {
         host.frame = NSRect(origin: .zero, size: size)
         host.autoresizingMask = [.width, .height]
         let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.addSubview(glassShadow)
         container.addSubview(glass)
         container.addSubview(host)
         panel.contentView = container
@@ -293,7 +296,9 @@ final class NotchController {
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
             glass.animator().frame = target
             glass.animator().alphaValue = visible ? 1 : 0
+            glassShadow.animator().alphaValue = (visible && mode != .compact) ? 1 : 0
         }
+        glassShadow.update(panel: target, radius: radius)
     }
 
     func show() {
