@@ -227,12 +227,13 @@ final class GlassView: NSVisualEffectView {
     /// Klik selalu diteruskan ke SwiftUI di atasnya.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    /// Gambar topeng yang bisa melar: atas lurus, dua sudut bawah membulat.
+    /// Topeng seukuran kaca: atas lurus, dua sudut bawah membulat. Dibuat persis seukuran bingkainya
+    /// (topeng yang "melar" lewat capInsets ternyata tidak selalu dihormati → sudut jadi lonjong).
     /// Radius sedikit dibesarkan supaya kaca tidak mengintip di luar sudut "continuous" panel.
-    static func mask(radius: CGFloat) -> NSImage {
-        let r = max(radius * 1.3, 1)
-        let side = ceil(r * 2 + 2)
-        let image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+    static func mask(size: CGSize, radius: CGFloat) -> NSImage {
+        let w = max(size.width, 1), h = max(size.height, 1)
+        let r = min(max(radius * 1.15, 1), min(w, h) / 2)
+        return NSImage(size: NSSize(width: w, height: h), flipped: false) { rect in
             NSColor.black.setFill()
             let path = NSBezierPath()
             path.move(to: NSPoint(x: 0, y: rect.maxY))
@@ -245,9 +246,6 @@ final class GlassView: NSVisualEffectView {
             path.fill()
             return true
         }
-        image.capInsets = NSEdgeInsets(top: 1, left: r, bottom: r, right: r)
-        image.resizingMode = .stretch
-        return image
     }
 }
 

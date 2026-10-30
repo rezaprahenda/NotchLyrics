@@ -172,6 +172,7 @@ final class NotchController {
     private let glass = GlassView()
     private var glassCancellables = Set<AnyCancellable>()
     private var glassRadius: CGFloat = -1
+    private var glassSize: CGSize = .zero
     private let player: PlayerMonitor
     private let lyrics: LyricsStore
     private let pomodoro: PomodoroModule
@@ -272,9 +273,10 @@ final class NotchController {
                             height: size.height)
 
         let radius = vm.cornerRadius(for: mode)
-        if radius != glassRadius {
+        if radius != glassRadius || target.size != glassSize {
             glassRadius = radius
-            glass.maskImage = GlassView.mask(radius: radius)
+            glassSize = target.size
+            glass.maskImage = GlassView.mask(size: target.size, radius: radius)
         }
         let wasHidden = glass.alphaValue < 0.01
         if wasHidden { glass.frame = target }

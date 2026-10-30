@@ -499,17 +499,35 @@ struct PrayerPage: View {
                 Text(L("\(countdown(to: next.time)) lagi", "in \(countdown(to: next.time))"))
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(.white.opacity(0.75))
+                Spacer(minLength: 8)
+                // Progres sejak waktu salat sebelumnya.
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.12))
+                        Capsule().fill(Color.prayerAccent)
+                            .frame(width: g.size.width * progress(until: next.time))
+                    }
+                }
+                .frame(height: 4)
+                .padding(.bottom, 8)
+            } else {
+                Spacer(minLength: 8)
             }
-            Spacer(minLength: 4)
-            Text(prayer.placeName.isEmpty ? prayer.hijriDate : prayer.placeName)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.white.opacity(0.55))
-                .lineLimit(1)
-            if let q = prayer.qibla {
-                Text(L("Kiblat \(Int(q.rounded()))°", "Qibla \(Int(q.rounded()))°"))
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.white.opacity(0.55))
+            HStack(spacing: 5) {
+                Text(prayer.placeName.isEmpty ? prayer.hijriDate : prayer.placeName)
+                    .lineLimit(1)
+                if let q = prayer.qibla {
+                    Spacer(minLength: 4)
+                    Image(systemName: "location.north.fill")
+                        .font(.system(size: 8))
+                        .rotationEffect(.degrees(q))
+                    Text("\(Int(q.rounded()))°")
+                        .monospacedDigit()
+                }
             }
+            .font(.system(size: 10.5))
+            .foregroundStyle(.white.opacity(0.6))
+            .help(prayer.qibla.map { L("Arah kiblat \(Int($0.rounded()))° dari utara", "Qibla \(Int($0.rounded()))° from north") } ?? "")
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -533,7 +551,8 @@ struct PrayerPage: View {
                 Spacer()
             }
             PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency && style == .vivid)
-                .frame(maxHeight: .infinity)
+                .frame(maxHeight: 72)
+            Spacer(minLength: 0)
             HStack(spacing: 0) {
                 ForEach(Array(obligatory.enumerated()), id: \.offset) { i, p in
                     let isNext = i == nextIndex
@@ -606,6 +625,15 @@ struct PrayerPage: View {
         }
         .padding(2)
         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.white.opacity(0.07)))
+    }
+
+    /// Progres dari waktu salat sebelumnya (atau tengah malam) menuju waktu berikutnya.
+    private func progress(until next: Date) -> Double {
+        let now = prayer.now
+        let start = prayer.last(before: now)?.time ?? Calendar.current.startOfDay(for: now)
+        let total = next.timeIntervalSince(start)
+        guard total > 0 else { return 0 }
+        return min(max(now.timeIntervalSince(start) / total, 0), 1)
     }
 
     private func countdown(to date: Date) -> String {
@@ -722,19 +750,23 @@ struct FocusPage: View {
                             .frame(maxWidth: 124)
                     }
                 }
-                .frame(width: 156, height: 156)
+                .frame(width: 146, height: 146)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                controls
-                if pomodoro.phase == .idle && pomodoro.waitingFor == nil {
-                    presets
+            // Kolom kanan setinggi cincin: tombol di atas, kartu statistik di bawah.
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    controls
+                    if pomodoro.phase == .idle && pomodoro.waitingFor == nil {
+                        presets
+                    }
                 }
+                Spacer(minLength: 10)
                 statsCard
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 146)
         }
-        .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -796,20 +828,20 @@ struct FocusPage: View {
         }
     }
 
-    /// Kartu statistik: menit hari ini, hari beruntun, dan batang 7 hari.
+    /// Kartu statistik: menit hari ini & hari beruntun berdampingan, batang 7 hari di kanan.
     private var statsCard: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            VStack(alignment: .leading, spacing: 7) {
-                statLine(minutesText(pomodoro.todayFocusMinutes), label: L("hari ini", "today"))
-                statLine(Text("\(pomodoro.streakDays)") + Text(L(" hari", pomodoro.streakDays == 1 ? " day" : " days")).font(.system(size: 12, weight: .bold, design: .rounded)),
-                         label: L("beruntun", "streak"))
-            }
-            Spacer(minLength: 0)
-            WeekBars(minutes: pomodoro.weekMinutes, accent: accent)
+        HStack(alignment: .bottom, spacing: 0) {
+            statLine(minutesText(pomodoro.todayFocusMinutes), label: L("hari ini", "today"))
+                .frame(minWidth: 64, alignment: .leading)
+            statLine(Text("\(pomodoro.streakDays)") + Text(L(" hari", pomodoro.streakDays == 1 ? " day" : " days")).font(.system(size: 12, weight: .bold, design: .rounded)),
+                     label: L("beruntun", "streak"))
+                .padding(.leading, 14)
+            Spacer(minLength: 10)
+            WeekBars(minutes: pomodoro.weekMinutes, accent: accent, maxHeight: 34)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
         .surfaceCard()
     }
 
@@ -849,7 +881,7 @@ struct WeekBars: View {
                         .fill(today
                               ? AnyShapeStyle(LinearGradient(colors: [accent.lighter(0.4), accent], startPoint: .top, endPoint: .bottom))
                               : AnyShapeStyle(Color.white.opacity(0.18)))
-                        .frame(width: 8, height: max(4, maxHeight * CGFloat(value) / CGFloat(top)))
+                        .frame(width: 9, height: max(4, maxHeight * CGFloat(value) / CGFloat(top)))
                     Text(i < days.count ? Self.initial(days[i]) : "")
                         .font(.system(size: 9.5, weight: today ? .bold : .medium))
                         .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(0.45))
