@@ -92,7 +92,7 @@ struct NotchRootView: View {
             NotchFill(style: style, deep: deep, notchHeight: vm.notchSize.height, totalHeight: size.height)
                 .clipShape(shape)
                 .overlay {
-                    if deep && style != .plain {
+                    if deep && style == .vivid {
                         // Garis terang tipis hanya di tepi bawah, supaya bentuk panel terbaca di wallpaper gelap.
                         shape.stroke(LinearGradient(stops: [
                             .init(color: .clear, location: 0),

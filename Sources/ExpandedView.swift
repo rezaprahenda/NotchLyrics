@@ -281,7 +281,7 @@ struct MusicPage: View {
             if let track = player.track {
                 HStack(spacing: 12) {
                     ArtworkView(image: player.artwork, size: 58, corner: 12)
-                        .shadow(color: .black.opacity(style == .plain ? 0 : 0.45), radius: 8, y: 4)
+                        .shadow(color: .black.opacity(style == .vivid ? 0.45 : 0), radius: 8, y: 4)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(track.title)
                             .font(.system(size: 14, weight: .semibold))
@@ -326,7 +326,7 @@ struct MusicPage: View {
         }
         .background {
             // Cahaya warna cover dari pojok kiri bawah (jauh dari notch), melebar sampai tepi panel.
-            if player.track != nil && !reduceTransparency && style != .plain {
+            if player.track != nil && !reduceTransparency && style == .vivid {
                 RadialGradient(colors: [accent.opacity(0.24), accent.opacity(0.06), .clear],
                                center: .bottomLeading, startRadius: 0, endRadius: 300)
                     .padding(.horizontal, -20)
@@ -532,7 +532,7 @@ struct PrayerPage: View {
                     .lineLimit(1)
                 Spacer()
             }
-            PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency && style != .plain)
+            PrayerArc(count: obligatory.count, position: position, glow: !reduceTransparency && style == .vivid)
                 .frame(maxHeight: .infinity)
             HStack(spacing: 0) {
                 ForEach(Array(obligatory.enumerated()), id: \.offset) { i, p in

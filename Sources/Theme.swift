@@ -109,7 +109,7 @@ struct SurfaceCard: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content.background {
             ZStack {
-                if style == .plain {
+                if style != .vivid {
                     shape.fill(tint?.opacity(0.12) ?? Color.white.opacity(0.06))
                 } else if reduceTransparency {
                     shape.fill(tint?.opacity(0.18) ?? Color(white: 0.11))
@@ -147,7 +147,7 @@ struct SoftGlow: ViewModifier {
     @Environment(\.panelStyle) private var style
 
     func body(content: Content) -> some View {
-        let on = enabled && !reduceTransparency && style != .plain
+        let on = enabled && !reduceTransparency && style == .vivid
         content.shadow(color: on ? color.opacity(0.55) : .clear, radius: radius)
     }
 }
@@ -274,16 +274,15 @@ struct NotchFill: View {
                 let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
                 ZStack {
                     // Kacanya sendiri digambar di belakang (GlassBackdrop, di NotchRootView); di sini hanya lapisan gelapnya.
-                    // Cukup gelap supaya teks putih tetap terbaca di atas jendela putih,
-                    // tapi warna di belakang masih tembus. Baris lirik (teks kecil) dibuat lebih gelap.
-                    let mid = deep ? 0.66 : 0.76
-                    let end = deep ? 0.56 : 0.70
+                    // Kaca polos: satu warna rata di bawah menu bar (seperti notecu), hanya ada
+                    // peralihan pendek dari hitam di bawah notch supaya tidak ada garis potong.
+                    let tint = deep ? 0.68 : 0.74
+                    let fadeEnd = min(solid + 24 / max(totalHeight, 1), 1)
                     LinearGradient(stops: [
                         .init(color: .black, location: 0),
                         .init(color: .black, location: solid),
-                        .init(color: .black.opacity(deep ? 0.82 : 0.86), location: solid + (1 - solid) * 0.18),
-                        .init(color: .black.opacity(mid), location: solid + (1 - solid) * 0.5),
-                        .init(color: .black.opacity(end), location: 1),
+                        .init(color: .black.opacity(tint), location: fadeEnd),
+                        .init(color: .black.opacity(tint), location: 1),
                     ], startPoint: .top, endPoint: .bottom)
                 }
             } else {

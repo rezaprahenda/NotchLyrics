@@ -161,8 +161,8 @@ struct GeneralSettings: View {
                     ForEach(PanelStyle.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                Text(L("Hidup: gradasi & cahaya halus · Kaca: bagian bawah tembus pandang buram · Polos: hitam rata",
-                       "Vivid: gradient & soft light · Glass: frosted lower part · Plain: flat black"))
+                Text(L("Hidup: gradasi & cahaya halus · Kaca: kaca gelap polos, tembus buram · Polos: hitam rata",
+                       "Vivid: gradient & soft light · Glass: plain frosted dark glass · Plain: flat black"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Picker(L("Tampilkan di", "Show on"), selection: $vm.displayPreference) {
