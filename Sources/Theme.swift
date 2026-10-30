@@ -270,7 +270,7 @@ struct NotchFill: View {
                     // Kacanya sendiri digambar di belakang (GlassBackdrop, di NotchRootView); di sini hanya lapisan gelapnya.
                     // Kaca polos: satu warna rata di bawah menu bar (seperti notecu), hanya ada
                     // peralihan pendek dari hitam di bawah notch supaya tidak ada garis potong.
-                    let tint = deep ? 0.68 : 0.74
+                    let tint = deep ? 0.5 : 0.6
                     let fadeEnd = min(solid + 24 / max(totalHeight, 1), 1)
                     LinearGradient(stops: [
                         .init(color: .black, location: 0),
