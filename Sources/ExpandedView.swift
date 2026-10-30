@@ -184,9 +184,7 @@ struct PanelHeader: View {
                     leftSide(at: ctx.date, width: side)
                         .frame(width: side, alignment: .leading)
                     Spacer(minLength: 0)
-                    Text(ctx.date, format: .dateTime.hour().minute())
-                        .monospacedDigit()
-                        .lineLimit(1)
+                    rightSide(at: ctx.date)
                         .frame(width: side, alignment: .trailing)
                 }
                 .frame(maxHeight: .infinity)
@@ -197,8 +195,7 @@ struct PanelHeader: View {
         .onAppear { weather.refreshIfStale() }
     }
 
-    /// Logo + sapaan + cuaca. Kalau tidak muat, nama dilepas dulu, lalu sapaannya; cuaca dipertahankan.
-    /// ViewThatFits memilih versi terpanjang yang benar-benar muat (tanpa "Morni…").
+    /// Kiri = identitas: karakter + sapaan. Kalau tidak muat, nama dilepas, lalu karakter saja.
     @ViewBuilder private func leftSide(at date: Date, width: CGFloat) -> some View {
         ViewThatFits(in: .horizontal) {
             leftRow(text: Self.greeting(at: date))
@@ -208,20 +205,30 @@ struct PanelHeader: View {
     }
 
     private func leftRow(text: String?) -> some View {
-        let w = weather.enabled ? weather.current : nil
-        return HStack(spacing: 6) {
+        HStack(spacing: 6) {
             Image(nsImage: Brand.mascot)
                 .resizable()
                 .interpolation(.high)
                 .frame(width: 22, height: 22)
-            if let text {
-                Text(text)
-            }
-            if let w {
-                if text != nil { Text("·").foregroundStyle(.white.opacity(0.35)) }
+            if let text { Text(text) }
+        }
+        .fixedSize()
+    }
+
+    /// Kanan = info: cuaca (ikon monokrom, senada dengan jam) + jam. Kalau sempit, cuaca dilepas.
+    private func rightSide(at date: Date) -> some View {
+        ViewThatFits(in: .horizontal) {
+            rightRow(at: date, showWeather: true)
+            rightRow(at: date, showWeather: false)
+        }
+    }
+
+    private func rightRow(at date: Date, showWeather: Bool) -> some View {
+        HStack(spacing: 6) {
+            if showWeather, weather.enabled, let w = weather.current {
                 HStack(spacing: 4) {
                     Image(systemName: w.symbol)
-                        .symbolRenderingMode(.multicolor)
+                        .symbolRenderingMode(.monochrome)
                         .font(.system(size: 11))
                     Text(w.temperatureText)
                         .monospacedDigit()
@@ -229,7 +236,10 @@ struct PanelHeader: View {
                 .help(weatherHelp(w))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(w.summary), \(w.temperatureText)")
+                Text("·").foregroundStyle(.white.opacity(0.35))
             }
+            Text(date, format: .dateTime.hour().minute())
+                .monospacedDigit()
         }
         .fixedSize()
     }
