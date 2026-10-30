@@ -209,44 +209,23 @@ extension EnvironmentValues {
 
 /// Kaca buram bawaan macOS (memburamkan apa pun di belakang jendela notch).
 ///
-/// Penting: lapisan kaca TIDAK boleh berada di dalam view yang diberi `.mask`, `.clipShape`
-/// atau `.shadow` SwiftUI — itu membuat macOS menggambarnya di luar layar dan kacanya
-/// berubah jadi abu-abu polos. Bentuknya diatur lewat `maskImage` milik NSVisualEffectView.
-struct GlassBackdrop: NSViewRepresentable {
-    let radius: CGFloat
-    var alpha: CGFloat = 1
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let v = NSVisualEffectView()
-        v.material = .hudWindow
-        v.blendingMode = .behindWindow
-        v.state = .active
-        v.isEmphasized = false
-        v.appearance = NSAppearance(named: .darkAqua)
-        v.maskImage = Self.mask(radius: radius)
-        v.alphaValue = alpha
-        return v
+/// Dipasang langsung di jendela, di bawah tampilan SwiftUI. Kalau ditaruh di dalam SwiftUI
+/// (yang memakai mask/clip/bayangan), macOS menggambarnya di luar layar dan kacanya jadi abu-abu polos.
+final class GlassView: NSVisualEffectView {
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        material = .hudWindow
+        blendingMode = .behindWindow
+        state = .active
+        isEmphasized = false
+        appearance = NSAppearance(named: .darkAqua)
+        alphaValue = 0
     }
 
-    func updateNSView(_ v: NSVisualEffectView, context: Context) {
-        if context.coordinator.radius != radius {
-            context.coordinator.radius = radius
-            v.maskImage = Self.mask(radius: radius)
-        }
-        if abs(v.alphaValue - alpha) > 0.01 {
-            NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.2
-                v.animator().alphaValue = alpha
-            }
-        }
-    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) tidak dipakai") }
 
-    func makeCoordinator() -> Coordinator { Coordinator(radius: radius) }
-
-    final class Coordinator {
-        var radius: CGFloat
-        init(radius: CGFloat) { self.radius = radius }
-    }
+    /// Klik selalu diteruskan ke SwiftUI di atasnya.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     /// Gambar topeng yang bisa melar: atas lurus, dua sudut bawah membulat.
     /// Radius sedikit dibesarkan supaya kaca tidak mengintip di luar sudut "continuous" panel.

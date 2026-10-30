@@ -167,6 +167,11 @@ final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
 final class NotchController {
     let vm = NotchViewModel()
     private let panel: NotchPanel
+    /// Kaca untuk gaya "Kaca": NSVisualEffectView biasa di bawah SwiftUI (bukan di dalamnya),
+    /// supaya macOS benar-benar bisa memburamkan isi layar di belakang jendela.
+    private let glass = GlassView()
+    private var glassCancellables = Set<AnyCancellable>()
+    private var glassRadius: CGFloat = -1
     private let player: PlayerMonitor
     private let lyrics: LyricsStore
     private let pomodoro: PomodoroModule
@@ -231,7 +236,55 @@ final class NotchController {
         let host = FirstMouseHostingView(rootView: root)
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: size)
-        panel.contentView = host
+        host.autoresizingMask = [.width, .height]
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        container.addSubview(glass)
+        container.addSubview(host)
+        panel.contentView = container
+
+        // Ikuti setiap perubahan tampilan (mode, ukuran, gaya, baris lirik).
+        let refresh: () -> Void = { [weak self] in DispatchQueue.main.async { self?.updateGlass() } }
+        vm.objectWillChange.sink { _ in refresh() }.store(in: &glassCancellables)
+        lyrics.objectWillChange.sink { _ in refresh() }.store(in: &glassCancellables)
+        NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+            .sink { _ in refresh() }.store(in: &glassCancellables)
+    }
+
+    /// Posisikan kaca tepat di belakang bagian notch yang turun di bawah menu bar.
+    private func updateGlass() {
+        let mode = vm.mode()
+        let showLine = vm.showsLyricLine(lyrics.state)
+        let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: lyrics.compactIsDouble)
+        let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let visible = vm.panelStyle == .glass && !reduce
+            && mode != .hidden && mode != .idle
+            && !(mode == .peek && vm.activePeek?.compact == true)
+            && size.height > vm.notchSize.height + 1
+            && !(mode == .compact && vm.lyricLineFaded)
+
+        let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
+        let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
+        let window = NotchViewModel.windowSize
+        let target = NSRect(x: (window.width - size.width) / 2 + leftCut,
+                            y: window.height - size.height,
+                            width: max(size.width - leftCut - rightCut, 0),
+                            height: size.height)
+
+        let radius = vm.cornerRadius(for: mode)
+        if radius != glassRadius {
+            glassRadius = radius
+            glass.maskImage = GlassView.mask(radius: radius)
+        }
+        let wasHidden = glass.alphaValue < 0.01
+        if wasHidden { glass.frame = target }
+        NSAnimationContext.runAnimationGroup { ctx in
+            // Mendekati pegas SwiftUI (response 0,4) supaya kaca ikut membesar/mengecil bersama panel.
+            ctx.duration = 0.32
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
+            glass.animator().frame = target
+            glass.animator().alphaValue = visible ? 1 : 0
+        }
     }
 
     func show() {

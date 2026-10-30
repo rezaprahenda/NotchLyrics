@@ -70,17 +70,8 @@ struct NotchRootView: View {
         // Kaca butuh transparansi; Reduce Transparency → kembali ke Hidup.
         let style: PanelStyle = (vm.panelStyle == .glass && reduceTransparency) ? .vivid : vm.panelStyle
 
-        // Kaca hanya untuk bagian yang turun di bawah menu bar.
-        let showGlass = style == .glass && mode != .hidden && mode != .idle && size.height > vm.notchSize.height + 1
-
+        // Kacanya sendiri (gaya Kaca) dipasang NotchController di bawah tampilan ini.
         ZStack(alignment: .top) {
-            if showGlass {
-                GlassBackdrop(radius: radius, alpha: lowerOpacity < 1 ? 0 : 1)
-                    .padding(.leading, leftCut)
-                    .padding(.trailing, rightCut)
-                    .frame(width: size.width, height: size.height)
-                    .allowsHitTesting(false)
-            }
             notchBody(mode: mode, size: size, shape: shape, deep: deep, style: style,
                       showLine: showLine, lowerOpacity: lowerOpacity)
         }
