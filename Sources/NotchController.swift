@@ -65,6 +65,13 @@ final class NotchViewModel: ObservableObject {
         PanelStyle(rawValue: UserDefaults.standard.string(forKey: "panelStyle") ?? "") ?? .vivid {
         didSet { UserDefaults.standard.set(panelStyle.rawValue, forKey: "panelStyle") }
     }
+    /// Kegelapan gaya Kaca (0,15 = bening, 0,75 = gelap).
+    @Published var glassDarkness: Double = {
+        let v = UserDefaults.standard.object(forKey: "glassDarkness") as? Double ?? 0.35
+        return min(max(v, 0.15), 0.75)
+    }() {
+        didSet { UserDefaults.standard.set(glassDarkness, forKey: "glassDarkness") }
+    }
     @Published var accentFromArtwork: Bool = NotchViewModel.storedBool("accentFromArtwork", false) {
         didSet { UserDefaults.standard.set(accentFromArtwork, forKey: "accentFromArtwork") }
     }

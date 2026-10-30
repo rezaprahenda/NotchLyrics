@@ -256,6 +256,8 @@ struct NotchFill: View {
     let deep: Bool
     let notchHeight: CGFloat
     let totalHeight: CGFloat
+    /// Kegelapan lapisan kaca (Pengaturan › Notch), 0,15–0,75.
+    var glassDarkness: Double = 0.35
 
     var body: some View {
         switch style {
@@ -274,7 +276,7 @@ struct NotchFill: View {
                     // Kacanya sendiri digambar di belakang (GlassBackdrop, di NotchRootView); di sini hanya lapisan gelapnya.
                     // Kaca polos: satu warna rata di bawah menu bar (seperti notecu), hanya ada
                     // peralihan pendek dari hitam di bawah notch supaya tidak ada garis potong.
-                    let tint = deep ? 0.5 : 0.6
+                    let tint = deep ? glassDarkness : min(glassDarkness + 0.1, 0.85)
                     let fadeEnd = min(solid + 24 / max(totalHeight, 1), 1)
                     LinearGradient(stops: [
                         .init(color: .black, location: 0),

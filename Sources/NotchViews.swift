@@ -89,7 +89,8 @@ struct NotchRootView: View {
     private func notchBody(mode: NotchMode, size: CGSize, shape: NotchShape, deep: Bool, style: PanelStyle,
                            showLine: Bool, lowerOpacity: Double) -> some View {
         ZStack(alignment: .top) {
-            NotchFill(style: style, deep: deep, notchHeight: vm.notchSize.height, totalHeight: size.height)
+            NotchFill(style: style, deep: deep, notchHeight: vm.notchSize.height, totalHeight: size.height,
+                      glassDarkness: vm.glassDarkness)
                 .clipShape(shape)
                 .overlay {
                     if deep && style == .vivid {

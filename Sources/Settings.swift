@@ -161,6 +161,22 @@ struct GeneralSettings: View {
                     ForEach(PanelStyle.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                if vm.panelStyle == .glass {
+                    HStack {
+                        Text(L("Kegelapan kaca", "Glass darkness"))
+                        Slider(value: $vm.glassDarkness, in: 0.15...0.75) {
+                            EmptyView()
+                        } minimumValueLabel: {
+                            Image(systemName: "sun.max").foregroundStyle(.secondary)
+                        } maximumValueLabel: {
+                            Image(systemName: "moon.fill").foregroundStyle(.secondary)
+                        }
+                        Text("\(Int((vm.glassDarkness * 100).rounded()))%")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 38, alignment: .trailing)
+                    }
+                }
                 Text(L("Hidup: gradasi & cahaya halus · Kaca: kaca gelap polos, tembus buram · Polos: hitam rata",
                        "Vivid: gradient & soft light · Glass: plain frosted dark glass · Plain: flat black"))
                     .font(.caption)
