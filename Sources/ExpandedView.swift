@@ -198,20 +198,24 @@ struct PanelHeader: View {
     }
 
     /// Logo + sapaan + cuaca. Kalau tidak muat, nama dilepas dulu, lalu sapaannya; cuaca dipertahankan.
+    /// ViewThatFits memilih versi terpanjang yang benar-benar muat (tanpa "Morni…").
     @ViewBuilder private func leftSide(at date: Date, width: CGFloat) -> some View {
+        ViewThatFits(in: .horizontal) {
+            leftRow(text: Self.greeting(at: date))
+            leftRow(text: Self.greeting(at: date, withName: false))
+            leftRow(text: nil)
+        }
+    }
+
+    private func leftRow(text: String?) -> some View {
         let w = weather.enabled ? weather.current : nil
-        let weatherWidth: CGFloat = w == nil ? 0 : 52
-        let full = Self.greeting(at: date)
-        let short = Self.greeting(at: date, withName: false)
-        let fits: (String) -> Bool = { 28 + CGFloat($0.count) * 6.6 + weatherWidth <= width }
-        let text: String? = fits(full) ? full : (fits(short) ? short : nil)
-        HStack(spacing: 6) {
+        return HStack(spacing: 6) {
             Image(nsImage: Brand.mascot)
                 .resizable()
                 .interpolation(.high)
                 .frame(width: 22, height: 22)
             if let text {
-                Text(text).lineLimit(1)
+                Text(text)
             }
             if let w {
                 if text != nil { Text("·").foregroundStyle(.white.opacity(0.35)) }
@@ -222,12 +226,12 @@ struct PanelHeader: View {
                     Text(w.temperatureText)
                         .monospacedDigit()
                 }
-                .fixedSize()
                 .help(weatherHelp(w))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(w.summary), \(w.temperatureText)")
             }
         }
+        .fixedSize()
     }
 
     /// "Berawan · hujan mulai ±16.00 · 3 jam: 27° 26° 26°"

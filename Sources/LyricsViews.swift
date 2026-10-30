@@ -113,6 +113,7 @@ struct SyncedLyricsView: View {
     @ObservedObject var lyrics: LyricsStore
     @State private var current: Int = -1
     @State private var hovered: Int?
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -141,7 +142,7 @@ struct SyncedLyricsView: View {
                                 } else {
                                     Text(line.text.isEmpty ? "♪" : line.text)
                                         .font(font)
-                                        .foregroundStyle(.white.opacity(isCurrent || isHovered ? 1 : (line.id < current ? 0.35 : 0.5)))
+                                        .foregroundStyle(.white.opacity(isCurrent || isHovered ? 1 : (line.id < current ? (style == .glass ? 0.5 : 0.35) : (style == .glass ? 0.66 : 0.5))))
                                 }
                                 if lyrics.romanizationEnabled, let latin = lyrics.romanized[line.id] {
                                     Text(latin)
