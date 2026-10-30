@@ -161,10 +161,6 @@ struct GlowRing: View {
     var body: some View {
         let p = min(max(progress, 0), 1)
         ZStack {
-            Circle()
-                .fill(RadialGradient(colors: [color.opacity(0.16), .clear], center: .init(x: 0.5, y: 0.35),
-                                     startRadius: 0, endRadius: 70))
-                .padding(lineWidth)
             Circle().stroke(Color.white.opacity(0.08), lineWidth: lineWidth)
             Circle()
                 .trim(from: 0, to: p)

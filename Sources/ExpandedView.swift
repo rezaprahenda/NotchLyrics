@@ -761,8 +761,8 @@ struct FocusPage: View {
                         presets
                     }
                 }
-                Spacer(minLength: 10)
                 statsCard
+                    .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 146)
@@ -841,7 +841,8 @@ struct FocusPage: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
+        // Kartu mengisi sisa tinggi kolom (sampai sejajar bawah cincin); isinya di tengah.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .surfaceCard()
     }
 
@@ -873,7 +874,7 @@ struct WeekBars: View {
     var body: some View {
         let top = max(minutes.max() ?? 0, 25)
         let days = PomodoroCore.lastDays(minutes.count, endingAt: Date())
-        HStack(alignment: .bottom, spacing: 6) {
+        HStack(alignment: .bottom, spacing: 3) {
             ForEach(Array(minutes.enumerated()), id: \.offset) { i, value in
                 let today = i == minutes.count - 1
                 VStack(spacing: 4) {
@@ -885,7 +886,9 @@ struct WeekBars: View {
                     Text(i < days.count ? Self.initial(days[i]) : "")
                         .font(.system(size: 9.5, weight: today ? .bold : .medium))
                         .foregroundStyle(today ? accent.lighter(0.4) : .white.opacity(0.45))
+                        .fixedSize()
                 }
+                .frame(width: 14)
                 .help(L("\(value) menit", "\(value) min"))
             }
         }
