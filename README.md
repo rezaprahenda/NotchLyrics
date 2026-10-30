@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="Resources/AppIcon.png" width="128" alt="popocu icon">
+  <img src="docs/brand/logo.jpg" width="280" alt="popocu: a yellow character with a notch-shaped tuft, headphones and a play-button mouth">
 </p>
-
-<h1 align="center">popocu</h1>
 
 <p align="center">
   <i>poni poni lucu</i> — a cute companion that lives in your MacBook's notch.<br>
@@ -11,6 +9,13 @@
 
 <p align="center">
   <img src="Resources/screenshot.png" width="640" alt="popocu expanded view with Japanese lyrics, romanization and translation">
+</p>
+
+<p align="center">
+  <img src="docs/brand/music.jpg" width="160" alt="Music">
+  <img src="docs/brand/focus.jpg" width="160" alt="Focus">
+  <img src="docs/brand/prayer.jpg" width="160" alt="Prayer">
+  <img src="docs/brand/shelf.jpg" width="160" alt="Shelf">
 </p>
 
 ---
