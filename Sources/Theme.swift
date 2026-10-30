@@ -109,7 +109,11 @@ struct SurfaceCard: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content.background {
             ZStack {
-                if style != .vivid {
+                if style == .glass {
+                    // Di atas kaca: kartu hampir bening, cukup garis tipis, supaya kacanya tetap terasa.
+                    shape.fill(tint?.opacity(0.07) ?? Color.white.opacity(0.025))
+                    shape.strokeBorder(Color.white.opacity(0.09), lineWidth: 1)
+                } else if style == .plain {
                     shape.fill(tint?.opacity(0.12) ?? Color.white.opacity(0.06))
                 } else if reduceTransparency {
                     shape.fill(tint?.opacity(0.18) ?? Color(white: 0.11))
