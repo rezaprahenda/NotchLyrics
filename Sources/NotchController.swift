@@ -491,7 +491,13 @@ final class NotchController {
             withAnimation(.easeOut(duration: 0.2)) { vm.lyricLineFaded = faded }
         }
 
-        var inside = mode != .hidden && activeRect.insetBy(dx: -4, dy: -4).contains(mouse)
+        // Kelonggaran 4 pt di sekeliling area aktif. Kalau baris lirik tembus klik, kelonggaran
+        // tidak boleh turun ke baris lirik: kursor yang diam di garis antara strip notch dan
+        // baris lirik tidak boleh membuka panel penuh.
+        let slop = activeRect.insetBy(dx: -4, dy: -4)
+        let hitRect = z.strip == nil ? slop
+            : NSRect(x: slop.minX, y: activeRect.minY, width: slop.width, height: slop.maxY - activeRect.minY)
+        var inside = mode != .hidden && hitRect.contains(mouse)
         // Di mode ringkas, area telinga (dan sisi yang sedang disembunyikan) hanya untuk
         // menyingkirkan sisi itu; jangan sampai membuka panel penuh. Pemicu buka panel
         // berjeda 0,12 detik, lebih cepat dari jeda sembunyi sisi (0,15), jadi harus
@@ -507,6 +513,17 @@ final class NotchController {
                 }
             }
             if let ear = vm.hiddenEar, columnRect(ear).contains(mouse) { inside = false }
+        }
+        // Panel penuh hanya dibuka dari zona notch yang sebenarnya (selebar notch, setinggi menu
+        // bar). Baris lirik di bawahnya dan telinga di samping tidak membuka panel, termasuk garis
+        // batas di antaranya. Kelonggaran hanya ke samping dan ke atas, tidak ke bawah.
+        if mode == .compact || mode == .idle {
+            let f = panel.frame
+            let notch = NSRect(x: f.midX - vm.baseWidth / 2, y: f.maxY - vm.notchSize.height,
+                               width: vm.baseWidth, height: vm.notchSize.height)
+            let notchHit = NSRect(x: notch.minX - 4, y: notch.minY,
+                                  width: notch.width + 8, height: notch.height + 4)
+            if !notchHit.contains(mouse) { expandAllowed = false }
         }
         if panel.ignoresMouseEvents == inside {
             panel.ignoresMouseEvents = !inside
