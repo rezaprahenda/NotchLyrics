@@ -53,12 +53,20 @@ final class NotchViewModel: ObservableObject {
     }
     /// Tutup peek yang sedang tampil (dipasang oleh NotchController, dipakai tombol di peek).
     var dismissPeek: (() -> Void)?
+    /// Singkirkan telinga musik (klik di bagian telinga di luar tombol), dipasang oleh NotchController.
+    var hideEar: ((EarSide) -> Void)?
     @Published var frontWindowFillsScreen = false
     @Published var lyricLineFaded = false
     @Published var lyricLineSuppressed = false
     /// Telinga (kiri: cover, kanan: equalizer) yang sedang disembunyikan karena kursor ada di
     /// menu bar di atasnya, supaya menu app (mis. "Server" di Tableau) terlihat dan bisa diklik.
     @Published var hiddenEar: EarSide?
+    /// Telinga musik yang sedang ditunjuk kursor: latarnya memudar dan isinya jadi tombol
+    /// (kiri: putar/jeda, kanan: lagu berikutnya). Telinga musik tidak lagi disembunyikan.
+    @Published var hoveredEar: EarSide?
+    /// Telinga sedang dipakai musik → hover mengubahnya jadi tombol; disingkirkan dengan memudar
+    /// (seperti baris lirik), bukan dipotong.
+    var earsAreControls: Bool { earOwner == .music || earOwner == .musicIdle }
 
     /// Warna equalizer & aksen mengikuti cover album (kalau tidak: warna app).
     @Published var panelStyle: PanelStyle =
@@ -182,6 +190,12 @@ final class NotchController {
     private var glassCancellables = Set<AnyCancellable>()
     private var glassRadius: CGFloat = -1
     private var glassSize: CGSize = .zero
+    /// Pudar kolom telinga musik pada kaca (mengikuti masker SwiftUI), dianimasikan manual
+    /// karena maskImage tidak bisa dianimasikan.
+    private var glassEarWidth: CGFloat = 0
+    private var glassFades = EarFades()
+    private var glassFadeTarget = EarFades()
+    private var glassFadeTimer: Timer?
     private let player: PlayerMonitor
     private let lyrics: LyricsStore
     private let pomodoro: PomodoroModule
@@ -273,8 +287,10 @@ final class NotchController {
         // Baris lirik yang sedang memudar (kursor mendekat) tidak berkaca; telinganya tetap.
         let glassHeight = (mode == .compact && vm.lyricLineFaded) ? vm.notchSize.height : size.height
 
-        let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
-        let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
+        // Telinga musik tidak dipotong, kacanya ikut memudar (lihat glassEarFade).
+        let musicEars = mode == .compact && vm.earsAreControls
+        let leftCut: CGFloat = (mode == .compact && !musicEars && vm.hiddenEar == .left) ? vm.earWidth : 0
+        let rightCut: CGFloat = (mode == .compact && !musicEars && vm.hiddenEar == .right) ? vm.earWidth : 0
         let window = NotchViewModel.windowSize
         let target = NSRect(x: (window.width - size.width) / 2 + leftCut,
                             y: window.height - glassHeight,
@@ -282,11 +298,15 @@ final class NotchController {
                             height: glassHeight)
 
         let radius = vm.cornerRadius(for: mode)
-        if radius != glassRadius || target.size != glassSize {
+        let earWidth = musicEars ? vm.earWidth : 0
+        let fades = musicEars ? EarFades(left: glassEarFade(.left), right: glassEarFade(.right)) : EarFades()
+        if radius != glassRadius || target.size != glassSize || earWidth != glassEarWidth {
             glassRadius = radius
             glassSize = target.size
-            glass.maskImage = GlassView.mask(size: target.size, radius: radius)
+            glassEarWidth = earWidth
+            applyGlassMask()
         }
+        if fades != glassFadeTarget { animateGlassFades(to: fades) }
         let wasHidden = glass.alphaValue < 0.01
         if wasHidden { glass.frame = target }
         NSAnimationContext.runAnimationGroup { ctx in
@@ -298,6 +318,37 @@ final class NotchController {
             glassShadow.animator().alphaValue = (visible && (mode == .expanded || (mode == .peek && vm.activePeek?.compact != true))) ? 1 : 0
         }
         glassShadow.update(panel: target, radius: radius)
+    }
+
+    /// Sama dengan earMask di NotchRootView: ditunjuk = gradasi dari tepi notch, disingkirkan = pudar rata.
+    private func glassEarFade(_ side: EarSide) -> EarFade {
+        if vm.hiddenEar == side { return EarFade(outer: 0.12, inner: 0.12, corner: 1) }
+        if vm.hoveredEar == side { return EarFade(outer: 0.25, inner: 1) }
+        return EarFade()
+    }
+
+    private func applyGlassMask() {
+        glass.maskImage = GlassView.mask(size: glassSize, radius: glassRadius, ear: glassEarWidth, fades: glassFades)
+    }
+
+    /// Pudar kaca selama 0,2 detik (easeOut), selaras dengan animasi SwiftUI.
+    private func animateGlassFades(to target: EarFades) {
+        glassFadeTarget = target
+        glassFadeTimer?.invalidate()
+        let start = glassFades
+        let began = Date()
+        let duration = 0.2
+        let t = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            let p = min(Date().timeIntervalSince(began) / duration, 1)
+            let e = CGFloat(1 - (1 - p) * (1 - p))
+            self.glassFades = EarFades(left: start.left.mix(target.left, e),
+                                       right: start.right.mix(target.right, e))
+            self.applyGlassMask()
+            if p >= 1 { timer.invalidate(); self.glassFadeTimer = nil }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        glassFadeTimer = t
     }
 
     func show() {
@@ -446,7 +497,15 @@ final class NotchController {
         // berjeda 0,12 detik, lebih cepat dari jeda sembunyi sisi (0,15), jadi harus
         // dicegah di sini, bukan menunggu `hiddenEar` terisi.
         if mode == .compact {
-            if earRect(.left).contains(mouse) || earRect(.right).contains(mouse) { inside = false }
+            if earRect(.left).contains(mouse) || earRect(.right).contains(mouse) {
+                if earsAreControls {
+                    // Telinga musik berisi tombol: harus bisa diklik, tapi tidak membuka panel.
+                    inside = true
+                    expandAllowed = false
+                } else {
+                    inside = false
+                }
+            }
             if let ear = vm.hiddenEar, columnRect(ear).contains(mouse) { inside = false }
         }
         if panel.ignoresMouseEvents == inside {
@@ -481,11 +540,24 @@ final class NotchController {
     private var earWork: DispatchWorkItem?
     private var pendingEar: EarSide??
 
-    /// Sembunyikan sisi yang telinganya didekati kursor; tetap tersembunyi selama kursor masih
-    /// di kolom sisi itu. Ada jeda kecil supaya tidak kedip saat kursor cuma lewat.
+    private var earsAreControls: Bool { vm.earsAreControls }
+
+    /// Telinga musik: tandai yang ditunjuk kursor (jadi tombol). Telinga lain (salat, fokus, rak):
+    /// sembunyikan sisi yang didekati kursor; tetap tersembunyi selama kursor masih di kolom sisi
+    /// itu. Ada jeda kecil supaya tidak kedip saat kursor cuma lewat.
     private func updateEars(_ mouse: NSPoint) {
         var side: EarSide?
-        if vm.mode() == .compact {
+        var hover: EarSide?
+        if vm.mode() == .compact && earsAreControls {
+            if let current = vm.hiddenEar, columnRect(current).contains(mouse) {
+                // Sudah disingkirkan lewat klik: tetap tersembunyi selama kursor di kolom itu.
+                side = current
+            } else if earRect(.left).contains(mouse) {
+                hover = .left
+            } else if earRect(.right).contains(mouse) {
+                hover = .right
+            }
+        } else if vm.mode() == .compact {
             if let current = vm.hiddenEar, columnRect(current).contains(mouse) {
                 side = current
             } else if earRect(.left).contains(mouse) {
@@ -493,6 +565,9 @@ final class NotchController {
             } else if earRect(.right).contains(mouse) {
                 side = .right
             }
+        }
+        if vm.hoveredEar != hover {
+            withAnimation(.easeOut(duration: 0.18)) { vm.hoveredEar = hover }
         }
         guard vm.hiddenEar != side else {
             earWork?.cancel()
@@ -505,12 +580,28 @@ final class NotchController {
         pendingEar = .some(side)
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { self.vm.hiddenEar = side }
+            let anim: Animation = self.earsAreControls
+                ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.85)
+            withAnimation(anim) { self.vm.hiddenEar = side }
             self.earWork = nil
             self.pendingEar = nil
         }
         earWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + (side == nil ? 0.25 : 0.15), execute: work)
+    }
+
+    /// Klik di bagian telinga musik yang kosong: singkirkan sisi itu (seperti dulu) supaya menu app
+    /// di baliknya bisa diklik. Muncul lagi setelah kursor keluar dari kolom sisi itu.
+    private func hideEarByClick(_ side: EarSide) {
+        earWork?.cancel()
+        earWork = nil
+        pendingEar = nil
+        withAnimation(.easeOut(duration: 0.2)) {
+            vm.hoveredEar = nil
+            vm.hiddenEar = side
+        }
+        // Langsung lepaskan klik di kolom itu, tanpa menunggu kursor bergerak.
+        updateHover()
     }
 
     /// Tampilkan judul + artis sebentar saat lagu berganti (tidak saat app baru dibuka).
@@ -529,6 +620,7 @@ final class NotchController {
 
     private func startCoordinator() {
         vm.dismissPeek = { [weak self] in self?.dismissPeek() }
+        vm.hideEar = { [weak self] side in self?.hideEarByClick(side) }
         pomodoro.onEvent = { [weak self] event in self?.handlePomodoro(event) }
         prayer.onEvent = { [weak self] event in self?.handlePrayer(event) }
         device.onPeek = { [weak self] event in self?.post(event) }

@@ -17,11 +17,22 @@ struct CompactView: View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 leftEar
+                    .opacity(musicEarHidden(.left) ? 0 : 1)
                 Spacer(minLength: vm.baseWidth)
                 rightEar
+                    .opacity(musicEarHidden(.right) ? 0 : 1)
             }
             .padding(.horizontal, 14)
             .frame(height: vm.notchSize.height)
+            .background {
+                // Bagian telinga musik di luar tombol: klik = singkirkan telinga itu.
+                // Tombol (putar/jeda, next) ada di atas lapisan ini, jadi kliknya tidak terganggu.
+                HStack(spacing: 0) {
+                    earHideArea(.left)
+                    Spacer(minLength: 0)
+                    earHideArea(.right)
+                }
+            }
 
             if showLine, let lines = lyrics.state.syncedLines {
                 // Berhenti berdetak saat musik di-pause, supaya tidak memakan CPU.
@@ -61,8 +72,9 @@ struct CompactView: View {
                 }
                 .padding(.horizontal, 16)
                 // Satu sisi disembunyikan → lirik pindah ke sisi yang tersisa.
-                .padding(.leading, vm.hiddenEar == .left ? vm.earWidth : 0)
-                .padding(.trailing, vm.hiddenEar == .right ? vm.earWidth : 0)
+                // Telinga musik hanya memudar, jadi liriknya tidak perlu bergeser.
+                .padding(.leading, vm.hiddenEar == .left && !vm.earsAreControls ? vm.earWidth : 0)
+                .padding(.trailing, vm.hiddenEar == .right && !vm.earsAreControls ? vm.earWidth : 0)
                 .frame(height: (lyrics.compactIsDouble ? vm.compactDoubleLyricHeight : vm.compactLyricHeight) - 4)
                 .clipped()
                 .opacity(vm.lyricLineSuppressed ? 0 : (vm.lyricLineFaded ? 0.15 : 1))
@@ -122,8 +134,11 @@ struct CompactView: View {
                 }
                 .frame(width: 24, height: 24)
             }
+        } else if vm.hoveredEar == .left {
+            EarButton(symbol: player.isPlaying ? "pause.fill" : "play.fill") { player.playPause() }
         } else {
             ArtworkView(image: player.artwork, size: 20, corner: 5)
+                .transition(.opacity)
         }
     }
 
@@ -158,9 +173,27 @@ struct CompactView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.75)
             .frame(maxWidth: earTextWidth, alignment: .trailing)
+        } else if vm.hoveredEar == .right {
+            EarButton(symbol: "forward.fill") { player.next() }
         } else {
             EqualizerView(isPlaying: player.isPlaying, color: vm.accent(for: player))
                 .frame(width: 20, height: 14)
+                .transition(.opacity)
+        }
+    }
+
+    private func musicEarHidden(_ side: EarSide) -> Bool {
+        vm.earsAreControls && vm.hiddenEar == side
+    }
+
+    @ViewBuilder private func earHideArea(_ side: EarSide) -> some View {
+        if vm.hoveredEar == side {
+            Color.clear
+                .frame(width: vm.earWidth)
+                .contentShape(Rectangle())
+                .onTapGesture { vm.hideEar?(side) }
+        } else {
+            Color.clear.frame(width: vm.earWidth)
         }
     }
 
@@ -182,5 +215,23 @@ struct CompactView: View {
     private var prayerSoonLabel: String {
         guard let next = prayer.next(after: prayer.now) else { return "" }
         return next.prayer == .maghrib && prayer.isRamadan ? L("Buka", "Iftar") : next.prayer.title
+    }
+}
+
+/// Tombol kecil yang muncul di telinga musik saat kursor menunjuknya.
+private struct EarButton: View {
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle().inset(by: -8))
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity.combined(with: .scale(scale: 0.7)))
     }
 }

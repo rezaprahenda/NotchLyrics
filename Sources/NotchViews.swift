@@ -57,8 +57,10 @@ struct NotchRootView: View {
         let doubleLine = lyrics.compactIsDouble
         let size = vm.size(for: mode, showsLyricLine: showLine, doubleLine: doubleLine)
         let radius = vm.cornerRadius(for: mode)
-        let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
-        let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
+        // Telinga musik yang disingkirkan memudar (lihat earMask), bukan dipotong.
+        let cutEars = mode == .compact && !vm.earsAreControls
+        let leftCut: CGFloat = (cutEars && vm.hiddenEar == .left) ? vm.earWidth : 0
+        let rightCut: CGFloat = (cutEars && vm.hiddenEar == .right) ? vm.earWidth : 0
         let shape = NotchShape(radius: radius, leftCut: leftCut, rightCut: rightCut)
         // Panel penuh & peek lebar memakai latar bergradasi; telinga tetap hitam pekat.
         let deep = mode == .expanded || (mode == .peek && vm.activePeek?.compact != true)
@@ -78,11 +80,45 @@ struct NotchRootView: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: mode)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: showLine)
         .animation(.spring(response: 0.4, dampingFraction: 0.82), value: doubleLine)
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: vm.hiddenEar)
+        .animation(vm.earsAreControls ? .easeOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.85),
+                   value: vm.hiddenEar)
         .frame(width: NotchViewModel.windowSize.width,
                height: NotchViewModel.windowSize.height,
                alignment: .top)
         .environment(\.colorScheme, .dark)
+    }
+
+    /// Masker satu kolom telinga: pekat biasa · ditunjuk = gradasi dari tepi notch ke luar ·
+    /// disingkirkan = pudar rata seperti baris lirik. Dibuat dari lapisan opacity supaya transisinya halus.
+    @ViewBuilder
+    private func earMask(_ side: EarSide, mode: NotchMode) -> some View {
+        let active = mode == .compact && vm.earsAreControls
+        let hidden = active && vm.hiddenEar == side
+        let hovered = active && !hidden && vm.hoveredEar == side
+        ZStack {
+            Rectangle().opacity(hidden || hovered ? 0 : 1)
+            LinearGradient(colors: side == .left ? [.black.opacity(0.25), .black] : [.black, .black.opacity(0.25)],
+                           startPoint: .leading, endPoint: .trailing)
+                .opacity(hovered ? 1 : 0)
+            Rectangle().opacity(hidden ? 0.12 : 0)
+        }
+        .frame(width: mode == .compact ? vm.earWidth : 0)
+    }
+
+    /// Bagian tengah (di bawah notch). Saat telinga musik disingkirkan, sudut bawahnya di sisi itu
+    /// ikut membulat, jadi yang tersisa tampak seperti panel utuh + "bayangan" telinga yang memudar.
+    private func middleMask(mode: NotchMode, radius: CGFloat) -> some View {
+        let active = mode == .compact && vm.earsAreControls
+        let left = active && vm.hiddenEar == .left
+        let right = active && vm.hiddenEar == .right
+        return ZStack {
+            Rectangle().opacity(left || right ? 0.12 : 0)
+            UnevenRoundedRectangle(topLeadingRadius: 0,
+                                   bottomLeadingRadius: left ? radius : 0,
+                                   bottomTrailingRadius: right ? radius : 0,
+                                   topTrailingRadius: 0,
+                                   style: .continuous)
+        }
     }
 
     @ViewBuilder
@@ -121,6 +157,16 @@ struct NotchRootView: View {
                             .init(color: .black.opacity(lowerOpacity + (1 - lowerOpacity) * 0.35), location: 0.3),
                             .init(color: .black.opacity(lowerOpacity), location: 1),
                         ], startPoint: .top, endPoint: .bottom)
+                    }
+                }
+                .mask(alignment: .top) {
+                    // Telinga musik yang ditunjuk kursor: seluruh kolom sisi itu (telinga + baris
+                    // lirik di bawahnya) memudar dengan gradasi yang mulai di tepi notch dan makin
+                    // pudar ke luar, supaya menu bar di baliknya terlihat. Isinya jadi tombol (CompactView).
+                    HStack(spacing: 0) {
+                        earMask(.left, mode: mode)
+                        middleMask(mode: mode, radius: shape.radius)
+                        earMask(.right, mode: mode)
                     }
                 }
 

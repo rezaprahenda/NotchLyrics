@@ -232,11 +232,13 @@ final class GlassView: NSVisualEffectView {
     /// Topeng seukuran kaca: atas lurus, dua sudut bawah membulat. Dibuat persis seukuran bingkainya
     /// (topeng yang "melar" lewat capInsets ternyata tidak selalu dihormati → sudut jadi lonjong).
     /// Radius sedikit dibesarkan supaya kaca tidak mengintip di luar sudut "continuous" panel.
-    static func mask(size: CGSize, radius: CGFloat) -> NSImage {
+    /// `ear` > 0: kolom telinga kiri/kanan selebar itu memudar sesuai `fades` (telinga musik yang
+    /// ditunjuk/disingkirkan), sama dengan masker SwiftUI di NotchRootView supaya kaca dan lapisan
+    /// gelapnya tidak "patah".
+    static func mask(size: CGSize, radius: CGFloat, ear: CGFloat = 0, fades: EarFades = EarFades()) -> NSImage {
         let w = max(size.width, 1), h = max(size.height, 1)
         let r = min(max(radius * 1.15, 1), min(w, h) / 2)
         return NSImage(size: NSSize(width: w, height: h), flipped: false) { rect in
-            NSColor.black.setFill()
             let path = NSBezierPath()
             path.move(to: NSPoint(x: 0, y: rect.maxY))
             path.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
@@ -245,10 +247,70 @@ final class GlassView: NSVisualEffectView {
             path.line(to: NSPoint(x: r, y: 0))
             path.appendArc(withCenter: NSPoint(x: r, y: r), radius: r, startAngle: 270, endAngle: 180, clockwise: true)
             path.close()
-            path.fill()
+            path.addClip()
+            let e = min(max(ear, 0), w / 2)
+            // Tengah: sudut bawah di sisi telinga yang disingkirkan ikut membulat; sisanya bayangan tipis.
+            let middle = NSRect(x: e, y: 0, width: w - 2 * e, height: h)
+            let cornerLimit = min(r, middle.width / 2, h)
+            let cl = fades.left.corner * cornerLimit, cr = fades.right.corner * cornerLimit
+            if cl > 0 || cr > 0 {
+                NSColor.black.withAlphaComponent(0.12).setFill()
+                NSBezierPath(rect: middle).fill()
+            }
+            NSColor.black.setFill()
+            bottomRounded(middle, left: cl, right: cr).fill()
+            if e > 0 {
+                let black = { (a: CGFloat) in NSColor.black.withAlphaComponent(a) }
+                NSGradient(starting: black(fades.left.outer), ending: black(fades.left.inner))?
+                    .draw(in: NSRect(x: 0, y: 0, width: e, height: h), angle: 0)
+                NSGradient(starting: black(fades.right.inner), ending: black(fades.right.outer))?
+                    .draw(in: NSRect(x: w - e, y: 0, width: e, height: h), angle: 0)
+            }
             return true
         }
     }
+}
+
+/// Persegi dengan atas lurus dan sudut bawah membulat sesuai radius masing-masing (0 = kotak).
+private func bottomRounded(_ r: NSRect, left: CGFloat, right: CGFloat) -> NSBezierPath {
+    let p = NSBezierPath()
+    p.move(to: NSPoint(x: r.minX, y: r.maxY))
+    p.line(to: NSPoint(x: r.maxX, y: r.maxY))
+    if right > 0 {
+        p.line(to: NSPoint(x: r.maxX, y: r.minY + right))
+        p.appendArc(withCenter: NSPoint(x: r.maxX - right, y: r.minY + right), radius: right,
+                    startAngle: 0, endAngle: 270, clockwise: true)
+    } else {
+        p.line(to: NSPoint(x: r.maxX, y: r.minY))
+    }
+    if left > 0 {
+        p.line(to: NSPoint(x: r.minX + left, y: r.minY))
+        p.appendArc(withCenter: NSPoint(x: r.minX + left, y: r.minY + left), radius: left,
+                    startAngle: 270, endAngle: 180, clockwise: true)
+    } else {
+        p.line(to: NSPoint(x: r.minX, y: r.minY))
+    }
+    p.close()
+    return p
+}
+
+/// Kepekatan satu kolom telinga: tepi luar & tepi yang menempel notch (1 = pekat).
+/// `corner`: seberapa membulat sudut bawah bagian tengah di sisi ini (0–1), saat telinga disingkirkan.
+struct EarFade: Equatable {
+    var outer: CGFloat = 1
+    var inner: CGFloat = 1
+    var corner: CGFloat = 0
+
+    func mix(_ to: EarFade, _ t: CGFloat) -> EarFade {
+        EarFade(outer: outer + (to.outer - outer) * t,
+                inner: inner + (to.inner - inner) * t,
+                corner: corner + (to.corner - corner) * t)
+    }
+}
+
+struct EarFades: Equatable {
+    var left = EarFade()
+    var right = EarFade()
 }
 
 /// Latar notch sesuai gaya. Area setinggi notch fisik selalu hitam pekat.
