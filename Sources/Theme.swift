@@ -272,24 +272,9 @@ struct NotchFill: View {
                 Color.black
             }
         case .glass:
-            if totalHeight > notchHeight + 1 {
-                let solid = min(max(notchHeight / max(totalHeight, 1), 0), 0.9)
-                ZStack {
-                    // Kacanya sendiri digambar di belakang (GlassBackdrop, di NotchRootView); di sini hanya lapisan gelapnya.
-                    // Kaca polos: satu warna rata di bawah menu bar (seperti notecu), hanya ada
-                    // peralihan pendek dari hitam di bawah notch supaya tidak ada garis potong.
-                    let tint = deep ? glassDarkness : min(glassDarkness + 0.1, 0.85)
-                    let fadeEnd = min(solid + 24 / max(totalHeight, 1), 1)
-                    LinearGradient(stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: solid),
-                        .init(color: .black.opacity(tint), location: fadeEnd),
-                        .init(color: .black.opacity(tint), location: 1),
-                    ], startPoint: .top, endPoint: .bottom)
-                }
-            } else {
-                Color.black
-            }
+            // Kaca utuh: seluruh panel (termasuk di samping notch) kaca dengan satu warna rata.
+            // Notch fisik tetap hitam sendiri, seperti pulau di atas lembaran kaca.
+            Color.black.opacity(deep ? glassDarkness : min(glassDarkness + 0.1, 0.85))
         }
     }
 }

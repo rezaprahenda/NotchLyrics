@@ -178,8 +178,8 @@ struct GeneralSettings: View {
                             .frame(width: 38, alignment: .trailing)
                     }
                 }
-                Text(L("Hidup: gradasi & cahaya halus · Kaca: kaca gelap polos, tembus buram · Polos: hitam rata",
-                       "Vivid: gradient & soft light · Glass: plain frosted dark glass · Plain: flat black"))
+                Text(L("Hidup: gradasi & cahaya halus · Kaca: seluruh panel kaca buram, notch tetap hitam · Polos: hitam rata",
+                       "Vivid: gradient & soft light · Glass: whole panel frosted, notch stays black · Plain: flat black"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Picker(L("Tampilkan di", "Show on"), selection: $vm.displayPreference) {

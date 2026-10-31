@@ -270,17 +270,16 @@ final class NotchController {
         let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
         let visible = vm.panelStyle == .glass && !reduce
             && mode != .hidden && mode != .idle
-            && !(mode == .peek && vm.activePeek?.compact == true)
-            && size.height > vm.notchSize.height + 1
-            && !(mode == .compact && vm.lyricLineFaded)
+        // Baris lirik yang sedang memudar (kursor mendekat) tidak berkaca; telinganya tetap.
+        let glassHeight = (mode == .compact && vm.lyricLineFaded) ? vm.notchSize.height : size.height
 
         let leftCut: CGFloat = (mode == .compact && vm.hiddenEar == .left) ? vm.earWidth : 0
         let rightCut: CGFloat = (mode == .compact && vm.hiddenEar == .right) ? vm.earWidth : 0
         let window = NotchViewModel.windowSize
         let target = NSRect(x: (window.width - size.width) / 2 + leftCut,
-                            y: window.height - size.height,
+                            y: window.height - glassHeight,
                             width: max(size.width - leftCut - rightCut, 0),
-                            height: size.height)
+                            height: glassHeight)
 
         let radius = vm.cornerRadius(for: mode)
         if radius != glassRadius || target.size != glassSize {
@@ -296,7 +295,7 @@ final class NotchController {
             ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1)
             glass.animator().frame = target
             glass.animator().alphaValue = visible ? 1 : 0
-            glassShadow.animator().alphaValue = (visible && mode != .compact) ? 1 : 0
+            glassShadow.animator().alphaValue = (visible && (mode == .expanded || (mode == .peek && vm.activePeek?.compact != true))) ? 1 : 0
         }
         glassShadow.update(panel: target, radius: radius)
     }
